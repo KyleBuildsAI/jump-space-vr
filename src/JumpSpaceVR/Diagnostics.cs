@@ -22,6 +22,60 @@ internal static partial class Diagnostics
         _frameTimeCount = Mathf.Min(_frameTimeCount + 1, FrameTimeSamples);
     }
 
+    /// <summary>The last N samples of a value, for measuring how much it wobbles.</summary>
+    public sealed class RollingRange
+    {
+        private readonly float[] _samples;
+        private int _next;
+        private int _count;
+
+        public RollingRange(int size) => _samples = new float[size];
+
+        public void Add(float value)
+        {
+            _samples[_next] = value;
+            _next = (_next + 1) % _samples.Length;
+            _count = Mathf.Min(_count + 1, _samples.Length);
+        }
+
+        public float Range
+        {
+            get
+            {
+                if (_count == 0)
+                    return 0f;
+                float min = float.MaxValue, max = float.MinValue;
+                for (var index = 0; index < _count; index++)
+                {
+                    min = Mathf.Min(min, _samples[index]);
+                    max = Mathf.Max(max, _samples[index]);
+                }
+                return max - min;
+            }
+        }
+
+        /// <summary>
+        /// Largest change in per-frame movement (second difference) over the window: how sharply the value jolts.
+        /// Steady climbs and slopes score near zero; bob, stair steps and shake score high.
+        /// </summary>
+        public float MaxSecondDifference
+        {
+            get
+            {
+                var start = _count < _samples.Length ? 0 : _next;
+                var worst = 0f;
+                for (var index = 2; index < _count; index++)
+                {
+                    var a = _samples[(start + index - 2) % _samples.Length];
+                    var b = _samples[(start + index - 1) % _samples.Length];
+                    var c = _samples[(start + index) % _samples.Length];
+                    worst = Mathf.Max(worst, Mathf.Abs(c - 2f * b + a));
+                }
+                return worst;
+            }
+        }
+    }
+
     /// <summary>Average frames per second over the last few seconds, or null before any frame was recorded.</summary>
     public static float? AverageFps
     {

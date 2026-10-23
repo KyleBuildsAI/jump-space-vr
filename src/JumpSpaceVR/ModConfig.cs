@@ -1,3 +1,6 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
 using MelonLoader;
 using UnityEngine;
 
@@ -139,4 +142,28 @@ internal sealed class ModConfig
     }
 
     public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 2.0f);
+
+    private readonly Dictionary<string, object> _temporaryOriginals = new();
+
+    /// <summary>
+    /// Test scenarios: changes a setting in memory only (never saved) and remembers the original for
+    /// <see cref="RestoreTemporary"/>. Throws when the setting or value is unknown.
+    /// </summary>
+    public void SetTemporarily(string name, string value)
+    {
+        var entry = _category.GetEntry(name) ?? throw new ArgumentException($"unknown setting '{name}'");
+        var type = entry.BoxedValue.GetType();
+        var parsed = type.IsEnum
+            ? Enum.Parse(type, value, ignoreCase: true)
+            : Convert.ChangeType(value, type, CultureInfo.InvariantCulture);
+        _temporaryOriginals.TryAdd(name, entry.BoxedValue);
+        entry.BoxedValue = parsed;
+    }
+
+    public void RestoreTemporary()
+    {
+        foreach (var (name, original) in _temporaryOriginals)
+            _category.GetEntry(name).BoxedValue = original;
+        _temporaryOriginals.Clear();
+    }
 }
