@@ -1,0 +1,78 @@
+using UnityEngine;
+using UnityEngine.XR;
+
+namespace JumpSpaceVR.Tracking;
+
+/// <summary>
+/// Reads the headset pose from the XR input subsystem and keeps a recenter reference so the
+/// player's seated forward direction maps onto the game camera's forward direction.
+/// </summary>
+internal sealed class HeadTracker
+{
+    private const string PositionUsage = "CenterEyePosition";
+    private const string RotationUsage = "CenterEyeRotation";
+    private const string FallbackPositionUsage = "DevicePosition";
+    private const string FallbackRotationUsage = "DeviceRotation";
+
+    private Vector3 _originPosition;
+    private Quaternion _originYawInverse = Quaternion.identity;
+    private bool _hasOrigin;
+
+    public bool IsTracking { get; private set; }
+
+    /// <summary>Headset pose relative to the recentered origin, in tracking-space meters.</summary>
+    public Vector3 LocalPosition { get; private set; }
+    public Quaternion LocalRotation { get; private set; } = Quaternion.identity;
+
+    public void Update()
+    {
+        IsTracking = TryReadRawPose(out var rawPosition, out var rawRotation);
+        if (!IsTracking)
+            return;
+
+        if (!_hasOrigin)
+            SetOrigin(rawPosition, rawRotation);
+
+        LocalPosition = _originYawInverse * (rawPosition - _originPosition);
+        LocalRotation = _originYawInverse * rawRotation;
+    }
+
+    public void Recenter()
+    {
+        if (TryReadRawPose(out var rawPosition, out var rawRotation))
+        {
+            SetOrigin(rawPosition, rawRotation);
+            Log.Msg("Recentered headset.");
+        }
+        else
+        {
+            _hasOrigin = false;
+        }
+    }
+
+    private void SetOrigin(Vector3 rawPosition, Quaternion rawRotation)
+    {
+        var yaw = rawRotation.eulerAngles.y;
+        _originYawInverse = Quaternion.Inverse(Quaternion.Euler(0f, yaw, 0f));
+        _originPosition = rawPosition;
+        _hasOrigin = true;
+    }
+
+    private static bool TryReadRawPose(out Vector3 position, out Quaternion rotation)
+    {
+        position = Vector3.zero;
+        rotation = Quaternion.identity;
+
+        var device = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+        if (!device.isValid)
+            return false;
+
+        var deviceId = device.deviceId;
+        var hasRotation = XrInputNative.TryGet(deviceId, RotationUsage, out rotation)
+                          || XrInputNative.TryGet(deviceId, FallbackRotationUsage, out rotation);
+        var hasPosition = XrInputNative.TryGet(deviceId, PositionUsage, out position)
+                          || XrInputNative.TryGet(deviceId, FallbackPositionUsage, out position);
+
+        return hasRotation && hasPosition;
+    }
+}
