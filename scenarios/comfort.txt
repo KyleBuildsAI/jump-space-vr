@@ -22,17 +22,17 @@ wait 2
 # The character stands up after the cinematic; let that finish.
 wait 8
 
-# Comfort: walking with "Stabilize view" on keeps vertical jolts (bob, knocks) out of the view. Measured on the
-# prologue stairs: 12-18 mm per frame squared with it on, 22-44 with it off (noisy; this guards against regressions).
+# Comfort: walking with "Stabilize view" on keeps vertical jolts (bob, steps) out of the view. eyeJolt is the largest
+# change in vertical eye speed between frames (cm/s). Measured on the prologue stairs: about 7 with it on, 230-335 off.
 config StabilizeView true
 input left.stick 0 1
 wait 2
-expect eyeJoltMm < 25
+expect eyeJolt < 30
 input left.stick 0 0
 wait 2
 config StabilizeView false
 input left.stick 0 -1
 wait 2
 log for comparison, without stabilization:
-expect eyeJoltMm > 0
+expect eyeJolt > 0
 input left.stick 0 0

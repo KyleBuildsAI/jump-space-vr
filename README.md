@@ -210,12 +210,12 @@ It prints a `PASS`/`FAIL` line per check, and the exit code is the number of fai
 | `smoke-hands.txt` (~30 s) | VR starts, the weapon fix is hooked, simulated hands are tracked where the script puts them |
 | `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits "Play Prologue"; a trigger click loads the prologue |
 | `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick; the trigger fires; at least 45 fps |
-| `comfort.txt` (~3 min) | Walking with "Stabilize view" on keeps vertical jolts low; prints the value with it off for comparison |
+| `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
 `hand`, `input`, `key`, `keyuntil`, `expect`, `config` (changes a setting for that run only), `snapshot`,
 `diagnostics`, `recenter`, `log` and `quit`. Metrics such as `cameraYaw`, `aimYawOffset`, `laserU`, `cutscene`, `fps`
-and `eyeJoltMm` are defined in `JumpSpaceVrMod.ScenarioMetric`.
+and `eyeJolt` are defined in `JumpSpaceVrMod.ScenarioMetric`.
 
 Other simulators, for checks the mock runtime can't do:
 - **SteamVR null driver**: real compositor, simulated headset (`test-cycle.ps1 -RuntimeManifest`). Add

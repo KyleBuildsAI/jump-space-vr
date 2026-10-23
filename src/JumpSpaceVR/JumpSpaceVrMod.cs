@@ -41,7 +41,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private Vector2? _pointerScreen;
     private bool _pointerOwnsCursor;
 
-    // Eye height over the last ~1.5 s, so tests can measure sudden vertical view jolts (bob, steps, landing).
+    // Eye height over the last ~1.5 s, so tests can measure sudden vertical view jolts (bob, steps, landing) in cm/s.
     private readonly Diagnostics.RollingSamples _eyeHeights = new(90);
     private CursorLockMode? _gameCursorLock;
     private bool _resetBodyYaw = true;
@@ -269,7 +269,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         return name switch
         {
             "fps" => Diagnostics.AverageFps,
-            "eyeJoltMm" => _eyeHeights.MaxSecondDifference * 1000f,
+            "eyeJolt" => _eyeHeights.MaxSpeedChange * 100f,
             "worstFrameMs" => Diagnostics.WorstFrameMs,
             "vrRendering" => _runtime != null && _runtime.IsRendering ? 1f : 0f,
             "inLevel" => IsInLevel() ? 1f : 0f,
@@ -621,7 +621,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
-                _eyeHeights.Add(_cameraRig.LeftEye.transform.position.y);
+                _eyeHeights.Add(_cameraRig.LeftEye.transform.position.y, Time.unscaledTime);
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;
                 _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.ViewRotation, headPosition, left.Rotation,
