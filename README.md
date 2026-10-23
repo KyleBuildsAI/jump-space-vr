@@ -142,8 +142,10 @@ launch with the mod.
 - **No controller vibration.** The game never sends rumble to gamepads, so there is nothing to forward.
 - **SteamVR overlays.** The SteamVR dashboard and overlay tools such as OVR Advanced Settings can take focus at
   startup. Close the dashboard if the game appears frozen in the headset.
-- **Untested on hardware.** Validation so far used Unity's OpenXR mock runtime and SteamVR's null (simulated)
-  headset. Reports from real headsets are welcome; include the `F10` snapshots and `MelonLoader/Latest.log`.
+- **Partly tested on hardware.** The headset view, menus and recentering were tested on a Quest 3 over Steam
+  Link. Automated scenario tests cover the laser pointer, motion aiming, turning and the trigger on the mock
+  runtime. Weapon-in-hand placement, comfort and frame rate in long sessions still need headset play. Reports are
+  welcome; include the `F10` snapshots and `MelonLoader/Latest.log`.
 
 ## Play responsibly
 
@@ -191,6 +193,33 @@ The script:
   controllers driven through `XR_EXT_conformance_automation`;
 - prints the mod's log and any crash recorded by Windows;
 - restores your normal settings.
+
+### Scripted VR tests (no headset, no person)
+
+`scenarios\*.txt` are scripted tests. The mod plays them against the mock runtime: it moves the simulated head and
+hands, presses controller inputs and keys, and checks the mod's state. Run one:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\dev\run-scenario.ps1 -Scenario scenarios\menu-and-pointer.txt
+```
+
+It prints a `PASS`/`FAIL` line per check, and the exit code is the number of failures.
+
+| Scenario | Checks |
+| --- | --- |
+| `smoke-hands.txt` (~30 s) | VR starts, the weapon fix is hooked, simulated hands are tracked where the script puts them |
+| `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits "Play Prologue"; a trigger click loads the prologue |
+| `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick |
+
+The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
+`hand`, `input`, `key`, `keyuntil`, `expect`, `snapshot`, `diagnostics`, `recenter`, `log` and `quit`. Metrics such as
+`cameraYaw`, `aimYawOffset`, `laserU` and `cutscene` are defined in `JumpSpaceVrMod.ScenarioMetric`.
+
+Other simulators, for checks the mock runtime can't do:
+- **SteamVR null driver**: real compositor, simulated headset (`test-cycle.ps1 -RuntimeManifest`). Add
+  VirtualMotionTracker for scripted controllers.
+- **Meta XR Simulator + Meta XR Operator**: Quest-like runtime controllable over MCP. It requires accepting
+  Meta's developer license.
 
 `scripts\package.ps1` builds a release zip into `dist/`.
 
