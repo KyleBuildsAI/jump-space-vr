@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.4.1", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.4.2", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -39,6 +39,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly RoomscaleLocomotion _roomscale = new();
     private readonly VirtualMouse _mouse = new();
     private readonly VrUi.CinematicBars _cinematicBars = new();
+    private readonly SessionReport _sessionReport = new();
+    private ControllerState _rawControllerState;
     private Vector2? _pointerScreen;
     private bool _pointerOwnsCursor;
 
@@ -105,6 +107,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         _scenario?.Update();
         HandleHotkeys();
         UpdateControllers();
+        if (_runtime != null && _runtime.IsRendering)
+            _sessionReport.RecordFrame(Time.unscaledDeltaTime, _rawControllerState, _pointerScreen.HasValue, IsInLevel(),
+                _motion.WeaponInHand, _eyeHeights.MaxSpeedChange * 100f);
 
         // The runtime ended the session (headset disconnected, runtime closed): tear down and retry.
         if (_runtime != null && _runtime.SessionLost)
@@ -210,6 +215,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         var state = _runtime.Controllers.Read();
         _lastControllerState = state;
+        _rawControllerState = state;
         if (!state.IsActive && _config.SyntheticControllers.Value)
             state = new ControllerState { IsActive = true, LeftStick = new Vector2(0.5f, 0f), RightTrigger = 1f, ButtonA = true };
 
@@ -573,6 +579,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        _sessionReport.Flush();
         _mouse.Remove();
         _pointerScreen = null;
         _motion.Deactivate();

@@ -124,6 +124,9 @@ launch with the mod.
 - **"UnityOpenXR.dll is missing".** Re-run `scripts\install.ps1`.
 - **Black or wrong image in the headset.** Press `F10` and `F9` and include the BMPs and
   `MelonLoader/Latest.log` when reporting the problem.
+- **Session report.** While VR runs, the mod writes a `[session]` line to `MelonLoader/Latest.log` every 5 minutes
+  and when VR stops or the game closes: frame rate, worst frame, how much of the time controllers were tracked,
+  trigger pulls and laser clicks, whether the weapon sat in your hand, and the worst view jolt. Include it in reports.
 - **Low frame rate.** Lower `RenderScale`. Each eye is a full HDRP render, so expect roughly twice the GPU cost of
   flat play.
 - **Anything else.** Run `scripts\uninstall.ps1 -GamePath "<game folder>"`, then use Steam's *Verify integrity of

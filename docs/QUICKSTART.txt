@@ -25,6 +25,8 @@ CONTROLS
   F7 ... recenter     F8 ... VR on/off     F9 ... diagnostics     F10 ... save what the headset sees
 
 PROBLEMS?
+  - Reporting a problem: press F10 and F9 in game, then send MelonLoader\Latest.log (it includes a
+    [session] summary of frame rate and controller input every 5 minutes).
   - Game stays flat: start SteamVR / Virtual Desktop / Quest Link and wait 10 seconds.
   - Wrong VR app picked: Insert menu > VR runtime (Auto / SteamVR / VirtualDesktop / MetaLink),
     then press F8 twice to restart VR.
