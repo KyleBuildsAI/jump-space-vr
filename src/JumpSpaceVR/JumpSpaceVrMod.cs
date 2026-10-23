@@ -304,6 +304,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "rightHandX" => _lastControllerState.RightHand.Position.x,
             "rightHandY" => _lastControllerState.RightHand.Position.y,
             "rightHandZ" => _lastControllerState.RightHand.Position.z,
+            _ when name.StartsWith("setting.", StringComparison.Ordinal) => _config.ReadAsNumber(name.Substring("setting.".Length)),
             _ => null,
         };
     }
