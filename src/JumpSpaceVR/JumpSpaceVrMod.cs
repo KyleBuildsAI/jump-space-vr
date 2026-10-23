@@ -38,6 +38,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly RoomscaleLocomotion _roomscale = new();
     private readonly VirtualMouse _mouse = new();
     private Vector2? _pointerScreen;
+    private bool _pointerOwnsCursor;
+    private CursorLockMode? _gameCursorLock;
     private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;
     private bool _menuChordFired;
@@ -203,6 +205,13 @@ public sealed class JumpSpaceVrMod : MelonMod
         // Laser pointer: while it touches the UI panel in a menu, the right trigger clicks instead of firing.
         if (_pointerScreen.HasValue)
         {
+            // The game locks the cursor whenever the gamepad was used last, and the UI input module ignores a
+            // locked pointer. Outside a level the laser owns the pointer, so keep it unlocked there.
+            if (_pointerOwnsCursor && Cursor.lockState != CursorLockMode.None)
+            {
+                _gameCursorLock = Cursor.lockState;
+                Cursor.lockState = CursorLockMode.None;
+            }
             _mouse.Send(_pointerScreen.Value, state.RightTrigger > 0.5f);
             state.RightTrigger = 0f;
         }
@@ -244,7 +253,24 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         _pointerScreen = null;
         _uiCompositor.CursorUv = null;
-        if (!_config.LaserPointer.Value || !pointer.IsValid || Cursor.lockState == CursorLockMode.Locked)
+        var inLevel = IsInLevel();
+        var ownedCursor = _pointerOwnsCursor;
+        _pointerOwnsCursor = false;
+        AimLaserPointer(pointer, inLevel);
+
+        // Hand the cursor back the way the game had it once the laser no longer owns it (left the panel or entered
+        // a level); the game doesn't re-lock it by itself.
+        if (ownedCursor && !_pointerOwnsCursor && _gameCursorLock.HasValue)
+        {
+            if (Cursor.lockState == CursorLockMode.None)
+                Cursor.lockState = _gameCursorLock.Value;
+            _gameCursorLock = null;
+        }
+    }
+
+    private void AimLaserPointer(in TrackedPose pointer, bool inLevel)
+    {
+        if (!_config.LaserPointer.Value || !pointer.IsValid || (inLevel && Cursor.lockState == CursorLockMode.Locked))
             return;
 
         var origin = _cameraRig.GamePosition + _cameraRig.ViewRotation * (pointer.Position * _config.WorldScale.Value);
@@ -254,7 +280,29 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         _uiCompositor.CursorUv = uv;
         _pointerScreen = new Vector2(uv.x * Screen.width, uv.y * Screen.height);
+        _pointerOwnsCursor = !inLevel;
     }
+
+    /// <summary>
+    /// True while a player character exists. In a level the laser only works when the game itself frees the cursor
+    /// (pause menu, terminals); outside one it always works, even with the cursor locked, because the game locks it
+    /// whenever the (virtual) gamepad is the active device. The camera lives under the camera manager, not the
+    /// character, so this looks for the character's camera controller (refreshed twice a second).
+    /// </summary>
+    private bool IsInLevel()
+    {
+        if (Time.frameCount >= _inLevelCheckFrame)
+        {
+            _inLevelCheckFrame = Time.frameCount + InLevelCheckIntervalFrames;
+            _inLevel = UnityEngine.Object.FindObjectsByType<Il2Cpp.CameraController_Character>(FindObjectsSortMode.None).Length > 0;
+        }
+        return _inLevel;
+    }
+
+    private const int InLevelCheckIntervalFrames = 45;
+    private int _inLevelCheckFrame;
+    private bool _inLevel;
+
     private ControllerState _lastControllerState;
     private float _menuPressedAt = -1f;
     private bool _menuHoldTriggered;

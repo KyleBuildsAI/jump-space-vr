@@ -52,6 +52,8 @@ internal sealed unsafe class VirtualGamepad
     private InputDevice _device;
     private bool _creationFailed;
     private bool _wasActive;
+    private (uint Buttons, Vector2 LeftStick, Vector2 RightStick, float LeftTrigger, float RightTrigger)? _lastSent;
+    private bool _wasFocused;
 
     public bool Send(in ControllerState controllers)
     {
@@ -96,6 +98,7 @@ internal sealed unsafe class VirtualGamepad
         try
         {
             _device = InputSystem.AddDevice("Gamepad", DeviceName, null);
+            _lastSent = null;
             Log.Msg($"Virtual gamepad added (device id {_device.deviceId}).");
             return true;
         }
@@ -114,6 +117,18 @@ internal sealed unsafe class VirtualGamepad
 
         var leftStick = ApplyDeadzone(controllers.LeftStick);
         var rightStick = ApplyDeadzone(controllers.RightStick);
+        var buttons = BuildButtons(controllers);
+
+        // Only send changes. An event every frame keeps the gamepad the Input System's current device, and the game
+        // then re-locks the cursor every frame, which races with the laser pointer's clicks in menus. The state is
+        // re-sent when the window regains focus, because the Input System resets devices on focus changes.
+        var focused = Application.isFocused;
+        var state = (buttons, leftStick, rightStick, controllers.LeftTrigger, controllers.RightTrigger);
+        if (focused == _wasFocused && _lastSent == state)
+            return;
+        _wasFocused = focused;
+        _lastSent = state;
+
         var stateEvent = new GamepadStateEvent
         {
             Type = StateEventType,
@@ -121,7 +136,7 @@ internal sealed unsafe class VirtualGamepad
             DeviceId = (ushort)_device.deviceId,
             Time = InputEventTime.Now,
             StateFormat = GamepadFormat,
-            Buttons = BuildButtons(controllers),
+            Buttons = buttons,
             LeftStickX = leftStick.x,
             LeftStickY = leftStick.y,
             RightStickX = rightStick.x,
