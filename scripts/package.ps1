@@ -30,12 +30,15 @@ Copy-Item (Join-Path $RepoRoot 'scripts\install.ps1'), (Join-Path $RepoRoot 'scr
 Set-Content -Path (Join-Path $staging 'Install.bat') -Value @'
 @echo off
 rem Installs Jump Space VR. Close the game first.
+rem A PowerShell 7 window leaks its module path into Windows PowerShell; start from the defaults.
+set PSModulePath=
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1" %*
 pause
 '@
 Set-Content -Path (Join-Path $staging 'Uninstall.bat') -Value @'
 @echo off
 rem Removes Jump Space VR (keeps MelonLoader so other mods keep working).
+set PSModulePath=
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\uninstall.ps1" %*
 pause
 '@
