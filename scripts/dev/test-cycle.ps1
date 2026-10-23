@@ -20,7 +20,9 @@ param(
     # Skip the simulated controllers (they hold buttons down, which gets in the way of keyboard-driven tests).
     [switch]$NoMockInput,
     # Rotate the simulated pointer to verify motion aiming moves the game camera.
-    [switch]$DebugAim
+    [switch]$DebugAim,
+    # Scenario script for the mod's test harness (see scenarios/).
+    [string]$Scenario
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,9 +30,9 @@ $ErrorActionPreference = 'Stop'
 function Set-RuntimeOverride([string]$RuntimeJson, [bool]$DeveloperOptions) {
     $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
     # TOML literal string: backslashes in Windows paths need no escaping.
-    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nDebugAimOffset = $(([string]($DeveloperOptions -and $DebugAim)).ToLower())`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $NoMockInput -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
+    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nScenarioFile = '$(if ($DeveloperOptions) { $Scenario } else { '' })'`r`nDebugAimOffset = $(([string]($DeveloperOptions -and $DebugAim)).ToLower())`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $NoMockInput -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
     $content = if (Test-Path $configFile) { Get-Content $configFile -Raw } else { '' }
-    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers|MockControllerInput|DebugAimOffset) = .*\r?\n?', '')
+    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers|MockControllerInput|DebugAimOffset|ScenarioFile) = .*\r?\n?', '')
     if ($content -match '(?m)^OpenXRRuntimeJson = .*$') {
         $content = [regex]::Replace($content, '(?m)^OpenXRRuntimeJson = .*$', [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $line })
     } elseif ($content -match '(?m)^\[JumpSpaceVR\]') {

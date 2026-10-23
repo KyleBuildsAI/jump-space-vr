@@ -1,0 +1,40 @@
+# Main menu: VR boots on the mock runtime, the UI panel follows the head, the laser pointer reaches the panel and
+# clicks "Play Prologue", and the prologue level loads.
+# Tracking space: head at 1.6 m; hand poses are absolute (meters / degrees: pitch yaw roll, negative pitch = up).
+
+waitfor vrRendering == 1 120
+head 0 1.6 0  0 0 0
+hand right 0.2 1.3 0.3  0 0 0
+recenter
+wait 2
+expect motionActive == 1
+
+# Accept the Early Access notice, skip the intro cinematic.
+key 0x0D
+wait 8
+keyuntil 0x1B 4 mainMenu == 1 90
+wait 3
+
+# Point at "Play Prologue" (left side of the panel) and check the laser lands on the panel's left half.
+hand right 0 1.6 0  6.2 -25 0
+wait 1
+expect laserOnPanel == 1
+expect laserU < 0.35
+expect cursorFree == 1
+expect laserV > 0.4
+expect laserV < 0.43
+diagnostics
+
+# Pull the trigger: the virtual mouse clicks the button and the prologue loads.
+input right.trigger 1
+wait 0.3
+input right.trigger 0
+waitfor inLevel == 1 150
+log prologue loaded through a laser-pointer click
+
+# In gameplay the game owns the cursor again and the trigger fires instead of clicking.
+waitfor cutscene == 1 90
+waitfor cutscene == 0 300
+wait 3
+expect cursorFree == 0
+expect laserOnPanel == 0
