@@ -1,0 +1,7 @@
+<Project>
+  <!-- Path to the Jump Space install. Override in Directory.Build.local.props or with -p:GamePath=... -->
+  <PropertyGroup>
+    <GamePath Condition="'$(GamePath)' == ''">G:\SteamLibrary\steamapps\common\JumpSpace</GamePath>
+  </PropertyGroup>
+  <Import Project="Directory.Build.local.props" Condition="Exists('Directory.Build.local.props')" />
+</Project>

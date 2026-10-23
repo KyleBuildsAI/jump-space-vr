@@ -1,0 +1,14 @@
+# Build output
+bin/
+obj/
+dist/
+*.user
+.vs/
+.idea/
+
+# Downloaded third-party runtime files (fetched by scripts/install.ps1)
+vendor/
+
+# Local overrides
+Directory.Build.local.props
+.env
