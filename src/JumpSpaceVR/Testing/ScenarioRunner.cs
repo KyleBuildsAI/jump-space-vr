@@ -74,10 +74,13 @@ internal sealed class ScenarioRunner
         return _steps.Count > 0;
     }
 
-    /// <summary>Advances the script. Call once per frame while VR is rendering on the mock runtime.</summary>
+    /// <summary>
+    /// Advances the script. Call once per frame, also while VR is off, so scenarios can toggle VR; steps that move
+    /// the simulated head do nothing until the mock runtime is running.
+    /// </summary>
     public void Update()
     {
-        if (!IsActive || !_mock.IsAvailable)
+        if (!IsActive)
             return;
 
         var now = Time.unscaledTime;

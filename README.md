@@ -213,6 +213,7 @@ It prints a `PASS`/`FAIL` line per check, and the exit code is the number of fai
 | `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick; the trigger fires; at least 45 fps |
 | `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
 | `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu; left stick navigates, A toggles a setting, B closes |
+| `vr-toggle.txt` (~1 min) | F8 turns VR off and on three times; the session restarts cleanly and hands, laser and weapon fix work afterwards |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
