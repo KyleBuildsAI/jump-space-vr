@@ -89,10 +89,7 @@ internal sealed class XrSubsystems
     {
         var nativePtr = SubsystemDescriptorBindings.Create(descriptor.m_Ptr);
         if (nativePtr == IntPtr.Zero)
-        {
-            Log.Error($"Native creation of '{descriptor.id}' failed.");
             return null;
-        }
 
         var subsystem = FindIntegratedSubsystem(nativePtr);
         if (subsystem == null)
@@ -102,7 +99,6 @@ internal sealed class XrSubsystems
         }
 
         subsystem.m_SubsystemDescriptor = descriptor.Cast<ISubsystemDescriptor>();
-        Log.Msg($"Created subsystem '{descriptor.id}'.");
         return subsystem;
     }
 

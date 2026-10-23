@@ -21,6 +21,10 @@ public sealed class JumpSpaceVrMod : MelonMod
 {
     private const int StartupDelayFrames = 120;
     private const int AutoDiagnosticsDelayFrames = 1200;
+    private const float RetryIntervalSeconds = 10f;
+
+    private float _nextRetryTime;
+    private bool _retryAnnounced;
 
     private ModConfig _config;
     private OpenXRRuntime _runtime;
@@ -77,6 +81,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         UpdateControllers();
 
         if (_frameCount == StartupDelayFrames && _vrRequested)
+            EnableVr();
+        else if (_frameCount > StartupDelayFrames && _vrRequested && _runtime != null && !_runtime.IsInitialized
+                 && Time.realtimeSinceStartup >= _nextRetryTime)
             EnableVr();
 
         // One automatic report shortly after startup makes user bug reports useful without extra steps.
@@ -160,16 +167,25 @@ public sealed class JumpSpaceVrMod : MelonMod
             var renderMode = _config.SinglePassInstanced.Value ? StereoRenderMode.SinglePassInstanced : StereoRenderMode.MultiPass;
             if (!_runtime.IsInitialized && !_runtime.Initialize(renderMode))
             {
-                _vrRequested = false;
+                // Usually the headset is not connected yet; keep trying so it can be connected after launch.
+                _nextRetryTime = Time.realtimeSinceStartup + RetryIntervalSeconds;
+                if (!_retryAnnounced)
+                {
+                    Log.Warning($"VR not started. Connect your headset (Virtual Desktop / SteamVR / Quest Link); retrying every {RetryIntervalSeconds:F0}s. Press {_config.ToggleVrKey.Value} to stop.");
+                    _retryAnnounced = true;
+                    _runtime.QuietFailures = true;
+                }
                 return;
             }
+            if (_retryAnnounced)
+                Log.Msg("Headset connected.");
+            _retryAnnounced = false;
+            _runtime.QuietFailures = false;
 
-            Log.Msg("Hooking render loop...");
             HookBeforeRender();
             XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
             _recenterPending = true;
 
-            Log.Msg("Starting OpenXR session...");
             if (!_runtime.Start())
             {
                 _vrRequested = false;
@@ -208,13 +224,6 @@ public sealed class JumpSpaceVrMod : MelonMod
                               && StereoRenderer.InstallHooks(HarmonyInstance);
     }
 
-    private int _traceFrames = 3;
-
-    private void Trace(string step)
-    {
-        if (_traceFrames > 0)
-            Log.Msg($"[trace] {step}");
-    }
 
     private void OnBeforeRender()
     {
@@ -223,24 +232,20 @@ public sealed class JumpSpaceVrMod : MelonMod
             if (_runtime == null || !_runtime.IsInitialized)
                 return;
 
-            Trace("pump");
             _runtime.PumpMessages();
             if (!_vrRequested || !_runtime.IsRendering)
                 return;
 
             if (_recenterPending)
             {
-                Trace("recenter");
                 _headTracker.Recenter();
                 _recenterPending = false;
             }
 
-            Trace("head");
             _headTracker.Update();
             if (!_stereoRenderer.PrepareFrame() || !OpenXRHooks.HasViews)
                 return;
 
-            Trace("eyes");
             OpenXRHooks.GetViews(out var leftView, out var rightView);
             var positional = _config.PositionalTracking.Value;
             var left = _headTracker.Localize(leftView, positional);
@@ -252,8 +257,6 @@ public sealed class JumpSpaceVrMod : MelonMod
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.GameRotation, _config.UiDistance.Value, _config.UiWidth.Value);
             }
-            Trace("done");
-            _traceFrames--;
         }
         catch (Exception exception)
         {

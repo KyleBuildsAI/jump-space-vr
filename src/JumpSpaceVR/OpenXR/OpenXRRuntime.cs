@@ -28,6 +28,9 @@ internal sealed class OpenXRRuntime
     public bool IsRendering => _subsystems.DisplayRunning;
     public NativeEvent SessionState => _sessionState;
     public XrSubsystems Subsystems => _subsystems;
+
+    /// <summary>Suppresses repeated failure messages while the mod retries in the background.</summary>
+    public bool QuietFailures { get; set; }
     public OpenXRControllers Controllers { get; } = new();
 
     public event Action<NativeEvent> SessionStateChanged;
@@ -38,10 +41,8 @@ internal sealed class OpenXRRuntime
             return true;
 
         _instance = this;
-        Log.Msg("Initializing OpenXR...");
         OpenXRNative.SetSuccessfullyInitialized(false);
 
-        Log.Msg("Loading OpenXR loader...");
         if (!OpenXRNative.LoadOpenXRLibrary(OpenXRNative.ToWideString(LoaderLibraryName)))
         {
             Log.Error("Failed to load the OpenXR loader (openxr_loader.dll).");
@@ -50,7 +51,6 @@ internal sealed class OpenXRRuntime
 
         OpenXRNative.SetProcAddressPtrAndLoadStage1(OpenXRHooks.Wrap(OpenXRNative.GetProcAddressPtr(true)));
 
-        Log.Msg("Creating OpenXR instance...");
         if (!OpenXRNative.InitializeSession())
         {
             Log.Error("OpenXR instance creation failed. Is a VR runtime (SteamVR, Virtual Desktop, Oculus) running and set as the active OpenXR runtime?");
@@ -58,20 +58,20 @@ internal sealed class OpenXRRuntime
             return false;
         }
 
-        Log.Msg("Registering OpenXR callbacks...");
         _nativeEventCallback = ReceiveNativeEvent;
         OpenXRNative.SetCallbacks(_nativeEventCallback);
         OpenXRNative.SetRenderMode(renderMode);
         SetApplicationInfo();
 
-        Log.Msg("Creating XR subsystems...");
         try
         {
             _subsystems.Create();
         }
         catch (Exception exception)
         {
-            Log.Error($"Subsystem creation failed: {exception.Message}");
+            if (!QuietFailures)
+                Log.Msg($"OpenXR display unavailable ({exception.Message}). See Player.log for the runtime's reason; " +
+                    "XR_ERROR_FORM_FACTOR_UNAVAILABLE means the headset is not connected.");
             Shutdown();
             return false;
         }

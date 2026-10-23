@@ -19,10 +19,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-function Set-RuntimeOverride([string]$RuntimeJson) {
+function Set-RuntimeOverride([string]$RuntimeJson, [bool]$DeveloperOptions) {
     $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
     # TOML literal string: backslashes in Windows paths need no escaping.
-    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string](-not $RealRuntime)).ToLower())`r`nSyntheticControllers = $(([string](-not $RealRuntime)).ToLower())"
+    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = $(([string]$DeveloperOptions).ToLower())"
     $content = if (Test-Path $configFile) { Get-Content $configFile -Raw } else { '' }
     $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers) = .*\r?\n?', '')
     if ($content -match '(?m)^OpenXRRuntimeJson = .*$') {
@@ -46,7 +46,7 @@ Copy-Item (Join-Path $RepoRoot 'dist\JumpSpaceVR.dll') (Join-Path $GamePath 'Mod
 
 $runtimeJson = ''
 if (-not $RealRuntime) { $runtimeJson = & (Join-Path $PSScriptRoot 'prepare-mock-runtime.ps1') }
-Set-RuntimeOverride $runtimeJson
+Set-RuntimeOverride $runtimeJson (-not $RealRuntime)
 
 $launchTime = Get-Date
 Start-Process 'steam://rungameid/1757300'
@@ -64,6 +64,10 @@ foreach ($crash in $crashes) {
     Write-Host '---- crash ----'
     Write-Host $crash.Message
 }
+
+# The game has read its config already; put the user's settings back to normal (real headset, no dev options).
+# The game is killed rather than closed by stop-game.ps1, so it will not write its in-memory copy back.
+Set-RuntimeOverride '' $false
 
 if (-not $KeepRunning) {
     & (Join-Path $PSScriptRoot 'stop-game.ps1') | Out-Null
