@@ -24,9 +24,9 @@ $ErrorActionPreference = 'Stop'
 function Set-RuntimeOverride([string]$RuntimeJson, [bool]$DeveloperOptions) {
     $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
     # TOML literal string: backslashes in Windows paths need no escaping.
-    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = $(([string]$DeveloperOptions).ToLower())"
+    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
     $content = if (Test-Path $configFile) { Get-Content $configFile -Raw } else { '' }
-    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers) = .*\r?\n?', '')
+    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers|MockControllerInput) = .*\r?\n?', '')
     if ($content -match '(?m)^OpenXRRuntimeJson = .*$') {
         $content = [regex]::Replace($content, '(?m)^OpenXRRuntimeJson = .*$', [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $line })
     } elseif ($content -match '(?m)^\[JumpSpaceVR\]') {

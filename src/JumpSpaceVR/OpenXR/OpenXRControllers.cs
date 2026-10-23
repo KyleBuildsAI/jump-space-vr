@@ -392,9 +392,11 @@ internal sealed unsafe class OpenXRControllers
     {
         var info = new XrActionStateGetInfo { Type = TypeActionStateGetInfo, Action = _actions[action] };
         var state = new XrActionStateBoolean { Type = TypeActionStateBoolean };
-        if (_getBoolean(_attachedSession, &info, &state) != XrSuccess || state.IsActive == 0)
+        if (_getBoolean(_attachedSession, &info, &state) != XrSuccess)
             return false;
-        anyActive = true;
+        // Some runtimes (e.g. Unity's mock) never set isActive; inactive inputs read as 0 everywhere, so a
+        // non-zero value also proves a controller is there.
+        anyActive |= state.IsActive != 0 || state.CurrentState != 0;
         return state.CurrentState != 0;
     }
 
@@ -402,9 +404,9 @@ internal sealed unsafe class OpenXRControllers
     {
         var info = new XrActionStateGetInfo { Type = TypeActionStateGetInfo, Action = _actions[action] };
         var state = new XrActionStateFloat { Type = TypeActionStateFloat };
-        if (_getFloat(_attachedSession, &info, &state) != XrSuccess || state.IsActive == 0)
+        if (_getFloat(_attachedSession, &info, &state) != XrSuccess)
             return 0f;
-        anyActive = true;
+        anyActive |= state.IsActive != 0 || state.CurrentState != 0f;
         return state.CurrentState;
     }
 
@@ -412,9 +414,9 @@ internal sealed unsafe class OpenXRControllers
     {
         var info = new XrActionStateGetInfo { Type = TypeActionStateGetInfo, Action = _actions[action] };
         var state = new XrActionStateVector2f { Type = TypeActionStateVector2f };
-        if (_getVector2(_attachedSession, &info, &state) != XrSuccess || state.IsActive == 0)
+        if (_getVector2(_attachedSession, &info, &state) != XrSuccess)
             return Vector2.zero;
-        anyActive = true;
+        anyActive |= state.IsActive != 0 || state.X != 0f || state.Y != 0f;
         return new Vector2(state.X, state.Y);
     }
 

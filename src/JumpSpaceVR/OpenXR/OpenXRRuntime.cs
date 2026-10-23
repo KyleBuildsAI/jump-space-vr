@@ -31,6 +31,9 @@ internal sealed class OpenXRRuntime
 
     /// <summary>Suppresses repeated failure messages while the mod retries in the background.</summary>
     public bool QuietFailures { get; set; }
+
+    /// <summary>Developer option: request XR_EXT_conformance_automation to drive simulated controllers.</summary>
+    public bool RequestConformanceAutomation { get; set; }
     public OpenXRControllers Controllers { get; } = new();
 
     public event Action<NativeEvent> SessionStateChanged;
@@ -50,6 +53,9 @@ internal sealed class OpenXRRuntime
         }
 
         OpenXRNative.SetProcAddressPtrAndLoadStage1(OpenXRHooks.Wrap(OpenXRNative.GetProcAddressPtr(true)));
+
+        if (RequestConformanceAutomation)
+            OpenXRNative.RequestEnableExtensionString(ConformanceInputDriver.ExtensionName);
 
         if (!OpenXRNative.InitializeSession())
         {

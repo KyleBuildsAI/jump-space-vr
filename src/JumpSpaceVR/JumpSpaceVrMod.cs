@@ -33,6 +33,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly StereoRenderer _stereoRenderer = new();
     private readonly VrUi.UiCompositor _uiCompositor = new();
     private readonly VirtualGamepad _gamepad = new();
+    private readonly ConformanceInputDriver _mockInput = new();
     private readonly HotkeyReader _hotkeys = new();
 
     private bool _vrRequested;
@@ -114,6 +115,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (!_vrRequested || _runtime == null || !_runtime.IsRendering || !_config.ControllersAsGamepad.Value)
             return;
 
+        if (_config.MockControllerInput.Value)
+            _mockInput.Apply();
+
         var state = _runtime.Controllers.Read();
         if (!state.IsActive && _config.SyntheticControllers.Value)
             state = new ControllerState { IsActive = true, LeftStick = new Vector2(0.5f, 0f), RightTrigger = 1f, ButtonA = true };
@@ -163,7 +167,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         try
         {
-            _runtime ??= new OpenXRRuntime();
+            _runtime ??= new OpenXRRuntime { RequestConformanceAutomation = _config.MockControllerInput.Value };
             var renderMode = _config.SinglePassInstanced.Value ? StereoRenderMode.SinglePassInstanced : StereoRenderMode.MultiPass;
             if (!_runtime.IsInitialized && !_runtime.Initialize(renderMode))
             {

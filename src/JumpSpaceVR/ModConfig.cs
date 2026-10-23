@@ -24,6 +24,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
     public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
     public MelonPreferences_Entry<bool> SyntheticControllers { get; }
+    public MelonPreferences_Entry<bool> MockControllerInput { get; }
 
     public ModConfig()
     {
@@ -57,6 +58,8 @@ internal sealed class ModConfig
             "Click both thumbsticks to recenter.");
         SyntheticControllers = _category.CreateEntry("SyntheticControllers", false, "Synthetic controllers",
             "Developer option: feed a fixed test input through the virtual gamepad when no controllers are active.");
+        MockControllerInput = _category.CreateEntry("MockControllerInput", false, "Mock controller input",
+            "Developer option: drive simulated controllers via XR_EXT_conformance_automation (Unity mock runtime only).");
         SnapshotOnStartup = _category.CreateEntry("SnapshotOnStartup", false, "Snapshot on startup",
             "Developer option: save eye snapshots once, shortly after VR starts.");
     }
