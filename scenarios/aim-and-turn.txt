@@ -20,6 +20,9 @@ wait 5
 recenter
 wait 2
 
+# The game's letterbox bars are hidden in VR.
+expect letterboxVisible == 0
+
 # The first-person rig sits on the controller: its item locator lands on the grip.
 expect weaponInHand == 1
 expect itemLocator == 1
