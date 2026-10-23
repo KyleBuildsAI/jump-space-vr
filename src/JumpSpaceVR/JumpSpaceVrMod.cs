@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using JumpSpaceVR.Controls;
 using JumpSpaceVR.OpenXR;
+using UnityEngine.InputSystem;
 using JumpSpaceVR.Rendering;
 using JumpSpaceVR.Tracking;
 using MelonLoader;
@@ -27,6 +28,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VrCameraRig _cameraRig = new();
     private readonly StereoRenderer _stereoRenderer = new();
     private readonly VrUi.UiCompositor _uiCompositor = new();
+    private readonly VirtualGamepad _gamepad = new();
     private readonly HotkeyReader _hotkeys = new();
 
     private bool _vrRequested;
@@ -72,6 +74,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _frameCount++;
         _cameraRig.RestoreGamePose();
         HandleHotkeys();
+        UpdateControllers();
 
         if (_frameCount == StartupDelayFrames && _vrRequested)
             EnableVr();
@@ -97,6 +100,31 @@ public sealed class JumpSpaceVrMod : MelonMod
         EyeSnapshot.SaveSingle(_uiCompositor.UiTexture, "ui");
         _stereoRenderer.CaptureSubmittedFrame((left, right) => EyeSnapshot.Save(left, right, "headset"));
     }
+
+    /// <summary>Feeds VR controllers to the game as a gamepad. Both stick clicks together recenters.</summary>
+    private void UpdateControllers()
+    {
+        if (!_vrRequested || _runtime == null || !_runtime.IsRendering || !_config.ControllersAsGamepad.Value)
+            return;
+
+        var state = _runtime.Controllers.Read();
+        if (!state.IsActive && _config.SyntheticControllers.Value)
+            state = new ControllerState { IsActive = true, LeftStick = new Vector2(0.5f, 0f), RightTrigger = 1f, ButtonA = true };
+
+        var recenterChord = state.LeftStickClick && state.RightStickClick;
+        if (recenterChord && !_recenterChordHeld)
+            _recenterPending = true;
+        _recenterChordHeld = recenterChord;
+
+        if (recenterChord)
+        {
+            state.LeftStickClick = false;
+            state.RightStickClick = false;
+        }
+        _gamepad.Send(state);
+    }
+
+    private bool _recenterChordHeld;
 
     private void HandleHotkeys()
     {
@@ -161,6 +189,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        _gamepad.Remove();
         _uiCompositor.Stop();
         _stereoRenderer.Deactivate();
         _stereoRenderer.LeftEyeCamera = null;
@@ -208,11 +237,11 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             Trace("head");
             _headTracker.Update();
-            if (!_stereoRenderer.PrepareFrame() || !OpenXRViewTracker.HasViews)
+            if (!_stereoRenderer.PrepareFrame() || !OpenXRHooks.HasViews)
                 return;
 
             Trace("eyes");
-            OpenXRViewTracker.GetViews(out var leftView, out var rightView);
+            OpenXRHooks.GetViews(out var leftView, out var rightView);
             var positional = _config.PositionalTracking.Value;
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);

@@ -22,6 +22,8 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<float> UiWidth { get; }
     public MelonPreferences_Entry<string> OpenXRRuntimeJson { get; }
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
+    public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
+    public MelonPreferences_Entry<bool> SyntheticControllers { get; }
 
     public ModConfig()
     {
@@ -50,6 +52,11 @@ internal sealed class ModConfig
         UiWidth = _category.CreateEntry("UiWidth", 1.9f, "UI width (m)");
         OpenXRRuntimeJson = _category.CreateEntry("OpenXRRuntimeJson", "", "OpenXR runtime override",
             "Optional path to an OpenXR runtime manifest (.json). Leave empty to use the system's active runtime.");
+        ControllersAsGamepad = _category.CreateEntry("ControllersAsGamepad", true, "VR controllers as gamepad",
+            "Play with VR controllers: sticks, triggers, grips (bumpers) and face buttons act like an Xbox controller. " +
+            "Click both thumbsticks to recenter.");
+        SyntheticControllers = _category.CreateEntry("SyntheticControllers", false, "Synthetic controllers",
+            "Developer option: feed a fixed test input through the virtual gamepad when no controllers are active.");
         SnapshotOnStartup = _category.CreateEntry("SnapshotOnStartup", false, "Snapshot on startup",
             "Developer option: save eye snapshots once, shortly after VR starts.");
     }

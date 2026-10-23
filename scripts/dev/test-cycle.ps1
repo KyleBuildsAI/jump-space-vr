@@ -22,9 +22,9 @@ $ErrorActionPreference = 'Stop'
 function Set-RuntimeOverride([string]$RuntimeJson) {
     $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
     # TOML literal string: backslashes in Windows paths need no escaping.
-    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string](-not $RealRuntime)).ToLower())"
+    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string](-not $RealRuntime)).ToLower())`r`nSyntheticControllers = $(([string](-not $RealRuntime)).ToLower())"
     $content = if (Test-Path $configFile) { Get-Content $configFile -Raw } else { '' }
-    $content = [regex]::Replace($content, '(?m)^SnapshotOnStartup = .*\r?\n?', '')
+    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers) = .*\r?\n?', '')
     if ($content -match '(?m)^OpenXRRuntimeJson = .*$') {
         $content = [regex]::Replace($content, '(?m)^OpenXRRuntimeJson = .*$', [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $line })
     } elseif ($content -match '(?m)^\[JumpSpaceVR\]') {

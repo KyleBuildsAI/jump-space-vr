@@ -28,6 +28,7 @@ internal sealed class OpenXRRuntime
     public bool IsRendering => _subsystems.DisplayRunning;
     public NativeEvent SessionState => _sessionState;
     public XrSubsystems Subsystems => _subsystems;
+    public OpenXRControllers Controllers { get; } = new();
 
     public event Action<NativeEvent> SessionStateChanged;
 
@@ -47,7 +48,7 @@ internal sealed class OpenXRRuntime
             return false;
         }
 
-        OpenXRNative.SetProcAddressPtrAndLoadStage1(OpenXRViewTracker.Wrap(OpenXRNative.GetProcAddressPtr(true)));
+        OpenXRNative.SetProcAddressPtrAndLoadStage1(OpenXRHooks.Wrap(OpenXRNative.GetProcAddressPtr(true)));
 
         Log.Msg("Creating OpenXR instance...");
         if (!OpenXRNative.InitializeSession())
@@ -131,6 +132,9 @@ internal sealed class OpenXRRuntime
             Log.Error("Failed to create the OpenXR session.");
             return false;
         }
+
+        // Action sets must be attached before the session begins, and before Unity could attach its own.
+        Controllers.Setup();
 
         if (_sessionState != NativeEvent.XrReady || !_startRequested)
             return true;

@@ -25,6 +25,27 @@ internal static class Diagnostics
             return $"valid={head.isValid}, name={(head.isValid ? head.name : "-")}";
         });
 
+        Section(report, "Controllers", () =>
+        {
+            var state = runtime.Controllers.Read();
+            return $"ready={runtime.Controllers.IsReady}, active={state.IsActive}, sticks={state.LeftStick}/{state.RightStick}, " +
+                   $"triggers={state.LeftTrigger:F2}/{state.RightTrigger:F2}";
+        });
+
+        Section(report, "Virtual gamepad", () =>
+        {
+            foreach (var device in UnityEngine.InputSystem.InputSystem.devices)
+            {
+                if (device.name != "JumpSpaceVR Controllers")
+                    continue;
+                var gamepad = device.TryCast<UnityEngine.InputSystem.Gamepad>();
+                return gamepad == null ? "present (not a gamepad?)" :
+                    $"leftStick={gamepad.leftStick.ReadValue()}, rightTrigger={gamepad.rightTrigger.ReadValue():F2}, " +
+                    $"south={gamepad.buttonSouth.isPressed}, current={UnityEngine.InputSystem.Gamepad.current?.name}";
+            }
+            return "not created";
+        });
+
         report.AppendLine("-- Cameras --");
         Section(report, "Main camera", () => Camera.main != null ? PathOf(Camera.main.transform) : "none");
         foreach (var camera in Camera.allCameras)

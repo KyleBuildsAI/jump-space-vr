@@ -26,11 +26,14 @@ internal struct EyeView
 }
 
 /// <summary>
-/// Intercepts xrLocateViews by wrapping xrGetInstanceProcAddr before UnityOpenXR loads its function table.
+/// Wraps xrGetInstanceProcAddr before UnityOpenXR loads its function table, to observe the OpenXR calls the
+/// mod depends on: xrLocateViews (eye poses and FOVs) and xrCreateSession (the session handle used for
+/// controller input). Also resolves further OpenXR functions for the mod's own use.
+///
 /// Every time Unity's display provider locates the eye views for a frame, the result is copied here, so the
 /// mod renders with exactly the poses and FOVs the compositor will reproject against.
 /// </summary>
-internal static unsafe class OpenXRViewTracker
+internal static unsafe class OpenXRHooks
 {
     private const int XrSuccess = 0;
     private const ulong OrientationValidBit = 0x1;
@@ -65,7 +68,34 @@ internal static unsafe class OpenXRViewTracker
     private static readonly LocateViewsDelegate LocateViewsHook = LocateViews;
     private static readonly IntPtr LocateViewsHookPointer = Marshal.GetFunctionPointerForDelegate(LocateViewsHook);
 
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate int CreateSessionDelegate(ulong instance, void* createInfo, ulong* session);
+
+    private static readonly CreateSessionDelegate CreateSessionHook = CreateSession;
+    private static readonly IntPtr CreateSessionHookPointer = Marshal.GetFunctionPointerForDelegate(CreateSessionHook);
+    private static delegate* unmanaged<ulong, void*, ulong*, int> _originalCreateSession;
+
     private static delegate* unmanaged<ulong, byte*, IntPtr*, int> _nextGetInstanceProcAddr;
+
+    /// <summary>The XrInstance handle Unity created (0 until known).</summary>
+    public static ulong Instance { get; private set; }
+
+    /// <summary>The XrSession handle Unity created (0 until known).</summary>
+    public static ulong Session { get; private set; }
+
+    /// <summary>Resolves an OpenXR function for the current instance, bypassing the hooks.</summary>
+    public static IntPtr Resolve(string name)
+    {
+        if (_nextGetInstanceProcAddr == null || Instance == 0)
+            return IntPtr.Zero;
+
+        var bytes = System.Text.Encoding.ASCII.GetBytes(name + "\0");
+        IntPtr function = IntPtr.Zero;
+        fixed (byte* namePointer = bytes)
+        {
+            return _nextGetInstanceProcAddr(Instance, namePointer, &function) == XrSuccess ? function : IntPtr.Zero;
+        }
+    }
     private static delegate* unmanaged<ulong, void*, XrViewState*, uint, uint*, XrView*, int> _originalLocateViews;
 
     private static readonly object Sync = new();
@@ -103,6 +133,14 @@ internal static unsafe class OpenXRViewTracker
                 _originalLocateViews = (delegate* unmanaged<ulong, void*, XrViewState*, uint, uint*, XrView*, int>)*function;
                 *function = LocateViewsHookPointer;
             }
+            else if (result == XrSuccess && function != null && *function != IntPtr.Zero && IsName(name, "xrCreateSession"))
+            {
+                _originalCreateSession = (delegate* unmanaged<ulong, void*, ulong*, int>)*function;
+                *function = CreateSessionHookPointer;
+            }
+
+            if (instance != 0)
+                Instance = instance;
         }
         catch
         {
@@ -127,6 +165,17 @@ internal static unsafe class OpenXRViewTracker
             Views[1] = ToEyeView(views[1]);
         }
         Interlocked.Increment(ref _frameStamp);
+        return result;
+    }
+
+    private static int CreateSession(ulong instance, void* createInfo, ulong* session)
+    {
+        var result = _originalCreateSession(instance, createInfo, session);
+        if (result == XrSuccess && session != null)
+        {
+            Instance = instance;
+            Session = *session;
+        }
         return result;
     }
 
