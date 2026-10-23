@@ -4,12 +4,25 @@
 #>
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory)]
     [string]$GamePath,
     [switch]$RemoveMelonLoader
 )
 
 $ErrorActionPreference = 'Stop'
+
+if (-not $GamePath) {
+    $steamPath = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+    if ($steamPath) {
+        $libraryFile = Join-Path $steamPath 'steamapps\libraryfolders.vdf'
+        $libraries = @($steamPath) + (Select-String -Path $libraryFile -Pattern '"path"\s+"(.+)"' |
+            ForEach-Object { $_.Matches[0].Groups[1].Value -replace '\\\\', '\' })
+        foreach ($library in $libraries) {
+            $candidate = Join-Path $library 'steamapps\common\JumpSpace'
+            if (Test-Path (Join-Path $candidate 'GameAssembly.dll')) { $GamePath = $candidate; break }
+        }
+    }
+    if (-not $GamePath) { $GamePath = (Read-Host 'Paste the Jump Space install folder').Trim('"', ' ') }
+}
 
 $dataDir = Get-ChildItem -Path $GamePath -Directory -Filter '*_Data' | Select-Object -First 1
 $targets = @(

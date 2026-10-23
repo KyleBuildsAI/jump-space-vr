@@ -33,8 +33,27 @@ rem Installs Jump Space VR. Close the game first.
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\install.ps1" %*
 pause
 '@
+Set-Content -Path (Join-Path $staging 'Uninstall.bat') -Value @'
+@echo off
+rem Removes Jump Space VR (keeps MelonLoader so other mods keep working).
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\uninstall.ps1" %*
+pause
+'@
+Copy-Item (Join-Path $RepoRoot 'docs\QUICKSTART.txt') $staging
 
 $zip = Join-Path $RepoRoot "dist\JumpSpaceVR-$version.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }
-Compress-Archive -Path (Join-Path $staging '*') -DestinationPath $zip
+# Entries are added one by one with '/' separators: Windows PowerShell 5 (Compress-Archive and ZipFile) writes '\',
+# which some extraction tools reject.
+Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
+$archive = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+    Get-ChildItem -Path $staging -Recurse -File | ForEach-Object {
+        $entryName = $_.FullName.Substring($staging.Length + 1).Replace('\', '/')
+        [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive, $_.FullName, $entryName,
+            [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+    }
+} finally {
+    $archive.Dispose()
+}
 Write-Host "Created $zip"

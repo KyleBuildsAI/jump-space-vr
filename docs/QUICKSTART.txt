@@ -1,0 +1,36 @@
+JUMP SPACE VR - QUICK START
+===========================
+
+You need:
+  - Jump Space (Steam), Windows 10/11
+  - A PC VR headset (Quest via Steam Link / Virtual Desktop / Quest Link, Index, Vive, ...)
+
+INSTALL (2 minutes)
+  1. Close Jump Space.
+  2. Double-click Install.bat. It finds the game, installs MelonLoader, the VR runtime files and the mod.
+     (If .NET 6 is missing it is installed automatically; say yes if Windows asks.)
+  3. Start your VR app first: SteamVR (Steam Link), Virtual Desktop, or the Meta Quest Link app.
+  4. Launch Jump Space from Steam. The FIRST launch takes a few extra minutes (MelonLoader prepares the game).
+     VR starts by itself once the game is loaded. No headset yet? It keeps retrying every 10 seconds.
+
+CONTROLS
+  Right controller ........ aim (point where you want to shoot)
+  Right trigger ........... fire        Left trigger ...... aim down sights
+  Left stick .............. move        Right stick ....... snap turn (smooth turn in the menu)
+  Grips ................... bumpers     A / B / X / Y ..... face buttons
+  Left menu button ........ pause (hold 1 s to recenter your view)
+  In menus ................ point at the screen and pull the trigger to click
+
+  Insert (or hold right thumbstick click 1 s) ... VR settings menu
+  F7 ... recenter     F8 ... VR on/off     F9 ... diagnostics     F10 ... save what the headset sees
+
+PROBLEMS?
+  - Game stays flat: start SteamVR / Virtual Desktop / Quest Link and wait 10 seconds.
+  - Wrong VR app picked: Insert menu > VR runtime (Auto / SteamVR / VirtualDesktop / MetaLink),
+    then press F8 twice to restart VR.
+  - Low frame rate: Insert menu > Render scale.
+  - Gun sits wrong in your hand: Insert menu > Weapon offset X/Y/Z.
+  - Remove the mod: double-click Uninstall.bat (or Steam > Verify integrity of game files).
+
+Please play solo or with friends who know you're using a mod. Don't send crash reports from the modded game
+to the developers.
