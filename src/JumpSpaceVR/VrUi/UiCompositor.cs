@@ -20,6 +20,8 @@ internal sealed class UiCompositor
     private const int GuiZTestAlways = 8;
     private static readonly string[] PanelShaderCandidates = { "UI/Default", "Sprites/Default", "Unlit/Transparent" };
 
+    private static readonly Matrix4x4 SwapchainFlip = Matrix4x4.Scale(new Vector3(1f, SystemInfo.graphicsUVStartsAtTop ? -1f : 1f, 1f));
+
     private RenderTexture _uiTexture;
     private Material _panelMaterial;
     private Mesh _panelMesh;
@@ -89,8 +91,10 @@ internal sealed class UiCompositor
             var camera = eyeCameras[eye];
             if (camera == null)
                 continue;
+            // Swapchain images are not Unity render textures, so Unity's usual render-to-texture Y flip is not
+            // applied when drawing into them. Flip here to match the eye images copied in from render textures.
             commands.SetRenderTarget(eyeTargets[eye]);
-            commands.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
+            commands.SetViewProjectionMatrices(camera.worldToCameraMatrix, SwapchainFlip * camera.projectionMatrix);
             commands.DrawMesh(_panelMesh, _panelMatrix, _panelMaterial, 0, 0);
         }
     }

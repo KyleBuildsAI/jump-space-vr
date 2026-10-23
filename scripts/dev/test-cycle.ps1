@@ -14,7 +14,9 @@ param(
     [string]$GamePath = 'G:\SteamLibrary\steamapps\common\JumpSpace',
     [int]$Seconds = 60,
     [switch]$KeepRunning,
-    [switch]$RealRuntime
+    [switch]$RealRuntime,
+    # Use a specific OpenXR runtime manifest (e.g. SteamVR's steamxr_win64.json with its null driver).
+    [string]$RuntimeManifest
 )
 
 $ErrorActionPreference = 'Stop'
@@ -45,7 +47,8 @@ if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 Copy-Item (Join-Path $RepoRoot 'dist\JumpSpaceVR.dll') (Join-Path $GamePath 'Mods') -Force
 
 $runtimeJson = ''
-if (-not $RealRuntime) { $runtimeJson = & (Join-Path $PSScriptRoot 'prepare-mock-runtime.ps1') }
+if ($RuntimeManifest) { $runtimeJson = $RuntimeManifest }
+elseif (-not $RealRuntime) { $runtimeJson = & (Join-Path $PSScriptRoot 'prepare-mock-runtime.ps1') }
 Set-RuntimeOverride $runtimeJson (-not $RealRuntime)
 
 $launchTime = Get-Date
