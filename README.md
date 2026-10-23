@@ -206,6 +206,12 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-scenario.ps1 -Scenario 
 
 It prints a `PASS`/`FAIL` line per check, and the exit code is the number of failures.
 
+Run them all (about 12 minutes; add `-IncludeSoak` for the 15-minute soak test):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\devun-all-scenarios.ps1
+```
+
 | Scenario | Checks |
 | --- | --- |
 | `smoke-hands.txt` (~30 s) | VR starts, the weapon fix is hooked, simulated hands are tracked where the script puts them |
