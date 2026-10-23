@@ -67,7 +67,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         BuildModMenu();
         if (_config.DebugAimOffset.Value)
         {
-            MotionControls.DebugPointerRotation = Quaternion.Euler(-15f, 30f, 0f);
+            MotionControls.DebugPointerRotation = Quaternion.Euler(_config.DebugAimPitch.Value, _config.DebugAimYaw.Value, 0f);
             MotionControls.DebugHandOffset = new Vector3(0.25f, -0.3f, 0.45f);
         }
         Diagnostics.DescribeMotion = () =>
@@ -484,7 +484,9 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _headTracker.ShiftOrigin(roomscaleStep / Mathf.Max(0.01f, _config.WorldScale.Value));
 
                 var controllers = _lastControllerState;
-                UpdateLaserPointer(_headTracker.Localize(controllers.RightPointer, positional));
+                var laserPointer = _headTracker.Localize(controllers.RightPointer, positional);
+                laserPointer.Rotation *= MotionControls.DebugPointerRotation;
+                UpdateLaserPointer(laserPointer);
                 _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
                     _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
                     _config.WorldScale.Value,

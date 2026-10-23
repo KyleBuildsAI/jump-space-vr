@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using System.Text;
+using UnityEngine;
 
 namespace JumpSpaceVR.OpenXR;
 
@@ -46,10 +47,10 @@ internal sealed unsafe class ConformanceInputDriver
         {
             _setActive(session, profile, left, 1),
             _setActive(session, profile, right, 1),
-            _setVector2(session, left, Path(instance, "/user/hand/left/input/thumbstick"), new XrVector2f { X = 0f, Y = 0.8f }),
-            _setFloat(session, right, Path(instance, "/user/hand/right/input/trigger/value"), 0.75f),
-            _setFloat(session, left, Path(instance, "/user/hand/left/input/squeeze/value"), 1f),
-            _setBool(session, right, Path(instance, "/user/hand/right/input/b/click"), 1),
+            // Only a pulsing trigger: enough to drive the gamepad path and laser-pointer clicks without a held
+            // stick or button fighting menu navigation.
+            _setFloat(session, right, Path(instance, "/user/hand/right/input/trigger/value"),
+                Mathf.Repeat(Time.unscaledTime, 1.2f) < 0.6f ? 0.75f : 0f),
         };
         if (!_reported)
         {
