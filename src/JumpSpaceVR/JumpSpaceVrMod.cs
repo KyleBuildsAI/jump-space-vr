@@ -19,11 +19,13 @@ namespace JumpSpaceVR;
 public sealed class JumpSpaceVrMod : MelonMod
 {
     private const int StartupDelayFrames = 120;
+    private const int AutoDiagnosticsDelayFrames = 1200;
 
     private ModConfig _config;
     private OpenXRRuntime _runtime;
     private readonly HeadTracker _headTracker = new();
     private readonly VrCameraRig _cameraRig = new();
+    private readonly StereoRenderer _stereoRenderer = new();
     private readonly HotkeyReader _hotkeys = new();
 
     private bool _vrRequested;
@@ -72,6 +74,14 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         if (_frameCount == StartupDelayFrames && _vrRequested)
             EnableVr();
+
+        // One automatic report shortly after startup makes user bug reports useful without extra steps.
+        if (_frameCount == StartupDelayFrames + AutoDiagnosticsDelayFrames && _runtime != null)
+        {
+            Diagnostics.Dump(_runtime);
+            if (_config.SnapshotOnStartup.Value)
+                EyeSnapshot.Save(_stereoRenderer.LeftTexture, _stereoRenderer.RightTexture);
+        }
     }
 
     public override void OnApplicationQuit()
@@ -93,6 +103,9 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         if (_hotkeys.WasPressed(_config.RecenterKey.Value))
             _recenterPending = true;
+
+        if (_hotkeys.WasPressed(_config.SnapshotKey.Value))
+            EyeSnapshot.Save(_stereoRenderer.LeftTexture, _stereoRenderer.RightTexture);
 
         if (_hotkeys.WasPressed(_config.DiagnosticsKey.Value))
         {
@@ -122,7 +135,11 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             Log.Msg("Starting OpenXR session...");
             if (!_runtime.Start())
+            {
                 _vrRequested = false;
+                return;
+            }
+            _stereoRenderer.Activate(_runtime.Subsystems.Display);
         }
         catch (Exception exception)
         {
@@ -133,6 +150,8 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        _stereoRenderer.Deactivate();
+        _stereoRenderer.RightEyeCamera = null;
         _cameraRig.Release();
         _runtime?.Stop();
         Log.Msg("VR stopped.");
@@ -143,7 +162,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (_beforeRenderHooked)
             return;
 
-        _beforeRenderHooked = BeforeRenderHook.Install(HarmonyInstance, OnBeforeRender);
+        _beforeRenderHooked = BeforeRenderHook.Install(HarmonyInstance, OnBeforeRender)
+                              && StereoRenderer.InstallHooks(HarmonyInstance);
     }
 
     private int _traceFrames = 3;
@@ -175,8 +195,16 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             Trace("head");
             _headTracker.Update();
-            Trace($"camera (tracking={_headTracker.IsTracking})");
-            _cameraRig.ApplyHeadPose(_headTracker, _config.PositionalTracking.Value, _config.WorldScale.Value);
+            if (!_stereoRenderer.PrepareFrame() || !OpenXRViewTracker.HasViews)
+                return;
+
+            Trace("eyes");
+            OpenXRViewTracker.GetViews(out var leftView, out var rightView);
+            var positional = _config.PositionalTracking.Value;
+            var left = _headTracker.Localize(leftView, positional);
+            var right = _headTracker.Localize(rightView, positional);
+            if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value))
+                _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
             Trace("done");
             _traceFrames--;
         }

@@ -15,22 +15,23 @@ internal static class Diagnostics
         report.AppendLine($"Screen: {Screen.width}x{Screen.height}, Graphics: {SystemInfo.graphicsDeviceType}");
         report.AppendLine($"OpenXR initialized: {runtime.IsInitialized}, session state: {runtime.SessionState}, rendering: {runtime.IsRendering}");
 
-        var display = runtime.Subsystems.Display;
-        if (display != null && display.running)
+        Section(report, "XR settings", () =>
+            $"deviceActive={XRSettings.isDeviceActive}, eyeTexture={XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight}, " +
+            $"scale={XRSettings.eyeTextureResolutionScale}");
+        Section(report, "HDRP XR", () => $"displayActive={UnityEngine.Experimental.Rendering.XRSystem.displayActive}");
+        Section(report, "Head device", () =>
         {
-            report.AppendLine($"XR display: passes={display.GetRenderPassCount()}, eyeTexture={XRSettings.eyeTextureWidth}x{XRSettings.eyeTextureHeight}, " +
-                              $"scale={XRSettings.eyeTextureResolutionScale}, stereoMode={XRSettings.stereoRenderingMode}");
-        }
-
-        var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
-        report.AppendLine($"Head device: valid={head.isValid}, name={(head.isValid ? head.name : "-")}");
+            var head = InputDevices.GetDeviceAtXRNode(XRNode.Head);
+            return $"valid={head.isValid}, name={(head.isValid ? head.name : "-")}";
+        });
 
         report.AppendLine("-- Cameras --");
+        Section(report, "Main camera", () => Camera.main != null ? PathOf(Camera.main.transform) : "none");
         foreach (var camera in Camera.allCameras)
         {
             report.AppendLine($"  {PathOf(camera.transform)} enabled={camera.enabled} depth={camera.depth} " +
                               $"target={(camera.targetTexture != null ? camera.targetTexture.name : "screen")} " +
-                              $"mask=0x{camera.cullingMask:X8} eye={camera.stereoTargetEye} fov={camera.fieldOfView:F1} near={camera.nearClipPlane}");
+                              $"mask=0x{camera.cullingMask:X8} fov={camera.fieldOfView:F1} near={camera.nearClipPlane}");
         }
 
         report.AppendLine("-- Canvases (root) --");
@@ -43,6 +44,18 @@ internal static class Diagnostics
         }
 
         Log.Msg(report.ToString());
+    }
+
+    private static void Section(StringBuilder report, string title, System.Func<string> describe)
+    {
+        try
+        {
+            report.AppendLine($"{title}: {describe()}");
+        }
+        catch (System.Exception exception)
+        {
+            report.AppendLine($"{title}: unavailable ({exception.GetType().Name})");
+        }
     }
 
     private static string PathOf(Transform transform)

@@ -1,3 +1,4 @@
+using JumpSpaceVR.OpenXR;
 using UnityEngine;
 using UnityEngine.XR;
 
@@ -17,6 +18,7 @@ internal sealed class HeadTracker
     private Vector3 _originPosition;
     private Quaternion _originYawInverse = Quaternion.identity;
     private bool _hasOrigin;
+    private Vector3 _rawPosition;
 
     public bool IsTracking { get; private set; }
 
@@ -33,6 +35,7 @@ internal sealed class HeadTracker
         if (!_hasOrigin)
             SetOrigin(rawPosition, rawRotation);
 
+        _rawPosition = rawPosition;
         LocalPosition = _originYawInverse * (rawPosition - _originPosition);
         LocalRotation = _originYawInverse * rawRotation;
     }
@@ -50,11 +53,25 @@ internal sealed class HeadTracker
         }
     }
 
+    /// <summary>
+    /// Re-expresses an eye view (tracking space) relative to the recentered origin. With positional
+    /// tracking off, head translation is removed but the eye's offset from the head (IPD) is kept.
+    /// </summary>
+    public EyeView Localize(in EyeView raw, bool positionalTracking)
+    {
+        var localized = raw;
+        var trackedPosition = positionalTracking ? raw.Position : raw.Position - _rawPosition + _originPosition;
+        localized.Position = _originYawInverse * (trackedPosition - _originPosition);
+        localized.Rotation = _originYawInverse * raw.Rotation;
+        return localized;
+    }
+
     private void SetOrigin(Vector3 rawPosition, Quaternion rawRotation)
     {
         var yaw = rawRotation.eulerAngles.y;
         _originYawInverse = Quaternion.Inverse(Quaternion.Euler(0f, yaw, 0f));
         _originPosition = rawPosition;
+        _rawPosition = rawPosition;
         _hasOrigin = true;
     }
 

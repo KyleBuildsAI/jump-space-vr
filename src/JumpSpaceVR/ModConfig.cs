@@ -12,6 +12,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<KeyCode> ToggleVrKey { get; }
     public MelonPreferences_Entry<KeyCode> RecenterKey { get; }
     public MelonPreferences_Entry<KeyCode> DiagnosticsKey { get; }
+    public MelonPreferences_Entry<KeyCode> SnapshotKey { get; }
     public MelonPreferences_Entry<bool> PositionalTracking { get; }
     public MelonPreferences_Entry<float> WorldScale { get; }
     public MelonPreferences_Entry<float> RenderScale { get; }
@@ -20,6 +21,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<float> UiDistance { get; }
     public MelonPreferences_Entry<float> UiWidth { get; }
     public MelonPreferences_Entry<string> OpenXRRuntimeJson { get; }
+    public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
 
     public ModConfig()
     {
@@ -32,6 +34,8 @@ internal sealed class ModConfig
             "Resets the seated position and facing direction to the current headset pose.");
         DiagnosticsKey = _category.CreateEntry("DiagnosticsKey", KeyCode.F9, "Diagnostics key",
             "Writes camera, canvas and XR state to the MelonLoader log.");
+        SnapshotKey = _category.CreateEntry("SnapshotKey", KeyCode.F10, "Eye snapshot key",
+            "Saves both eye images to UserData/JumpSpaceVR for troubleshooting.");
         PositionalTracking = _category.CreateEntry("PositionalTracking", true, "Positional tracking",
             "Apply headset translation (6DoF). Disable for rotation-only head tracking.");
         WorldScale = _category.CreateEntry("WorldScale", 1.0f, "World scale",
@@ -46,6 +50,8 @@ internal sealed class ModConfig
         UiWidth = _category.CreateEntry("UiWidth", 1.9f, "UI width (m)");
         OpenXRRuntimeJson = _category.CreateEntry("OpenXRRuntimeJson", "", "OpenXR runtime override",
             "Optional path to an OpenXR runtime manifest (.json). Leave empty to use the system's active runtime.");
+        SnapshotOnStartup = _category.CreateEntry("SnapshotOnStartup", false, "Snapshot on startup",
+            "Developer option: save eye snapshots once, shortly after VR starts.");
     }
 
     public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 2.0f);

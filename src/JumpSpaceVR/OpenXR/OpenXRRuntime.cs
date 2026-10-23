@@ -47,7 +47,7 @@ internal sealed class OpenXRRuntime
             return false;
         }
 
-        OpenXRNative.SetProcAddressPtrAndLoadStage1(OpenXRNative.GetProcAddressPtr(true));
+        OpenXRNative.SetProcAddressPtrAndLoadStage1(OpenXRViewTracker.Wrap(OpenXRNative.GetProcAddressPtr(true)));
 
         Log.Msg("Creating OpenXR instance...");
         if (!OpenXRNative.InitializeSession())

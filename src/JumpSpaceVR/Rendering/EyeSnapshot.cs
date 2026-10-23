@@ -1,0 +1,88 @@
+using System;
+using System.IO;
+using UnityEngine;
+
+namespace JumpSpaceVR.Rendering;
+
+/// <summary>
+/// Saves the current eye images as BMP files (UserData/JumpSpaceVR) so rendering problems can be checked,
+/// and reported, without a headset. BMP is written by hand because the image encoders were stripped.
+/// </summary>
+internal static class EyeSnapshot
+{
+    public static void Save(RenderTexture left, RenderTexture right)
+    {
+        if (left == null || right == null)
+        {
+            Log.Warning("No eye textures to capture yet.");
+            return;
+        }
+
+        var directory = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "JumpSpaceVR");
+        Directory.CreateDirectory(directory);
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        Write(left, Path.Combine(directory, $"eye-left-{stamp}.bmp"));
+        Write(right, Path.Combine(directory, $"eye-right-{stamp}.bmp"));
+        Log.Msg($"Saved eye snapshots to {directory}");
+    }
+
+    private static void Write(RenderTexture source, string path)
+    {
+        var previous = RenderTexture.active;
+        var readable = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+        try
+        {
+            RenderTexture.active = source;
+            readable.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0, false);
+            readable.Apply(false, false);
+            var pixels = readable.GetPixels32();
+            WriteBitmap(path, source.width, source.height, pixels);
+        }
+        finally
+        {
+            RenderTexture.active = previous;
+            UnityEngine.Object.Destroy(readable);
+        }
+    }
+
+    private static void WriteBitmap(string path, int width, int height, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Color32> pixels)
+    {
+        const int headerSize = 54;
+        var rowSize = width * 3;
+        var padding = (4 - rowSize % 4) % 4;
+        var imageSize = (rowSize + padding) * height;
+
+        using var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
+        using var writer = new BinaryWriter(stream);
+        writer.Write((byte)'B');
+        writer.Write((byte)'M');
+        writer.Write(headerSize + imageSize);
+        writer.Write(0);
+        writer.Write(headerSize);
+        writer.Write(40);
+        writer.Write(width);
+        writer.Write(height);
+        writer.Write((short)1);
+        writer.Write((short)24);
+        writer.Write(0);
+        writer.Write(imageSize);
+        writer.Write(2835);
+        writer.Write(2835);
+        writer.Write(0);
+        writer.Write(0);
+
+        // Texture rows start at the bottom, which is also BMP's native order.
+        for (var row = 0; row < height; row++)
+        {
+            for (var column = 0; column < width; column++)
+            {
+                var pixel = pixels[row * width + column];
+                writer.Write(pixel.b);
+                writer.Write(pixel.g);
+                writer.Write(pixel.r);
+            }
+            for (var pad = 0; pad < padding; pad++)
+                writer.Write((byte)0);
+        }
+    }
+}
