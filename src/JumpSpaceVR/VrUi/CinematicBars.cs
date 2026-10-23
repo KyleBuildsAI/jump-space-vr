@@ -1,19 +1,21 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace JumpSpaceVR.VrUi;
 
 /// <summary>
-/// The game's letterbox bars (PF_FadeToBlack top and bottom panels) frame scripted moments on a monitor, but on the
-/// VR panel they become two black slabs floating in front of the player. Hides them while VR runs.
+/// The game's letterbox bars frame scripted moments on a monitor (PF_FadeToBlack's top and bottom panels during the
+/// prologue walk, LetterBox_Upper/Lower in cutscenes), but on the VR panel they become black slabs floating in front
+/// of the player. Hides them while VR runs.
 /// </summary>
 internal sealed class CinematicBars
 {
-    private const string BarsRoot = "PF_FadeToBlackController(Clone)/PF_FadeToBlack";
-    private static readonly string[] BarNames = { "TopPannel", "BottomPannel" };
+    private static readonly string[] BarNames = { "TopPannel", "BottomPannel", "LetterBox_Upper", "LetterBox_Lower" };
     private const float LookupIntervalSeconds = 2f;
 
-    private Graphic[] _bars = System.Array.Empty<Graphic>();
+    private Graphic[] _bars = Array.Empty<Graphic>();
     private float _nextLookup;
     private bool _hidden;
 
@@ -22,30 +24,31 @@ internal sealed class CinematicBars
         if (hide && Time.unscaledTime >= _nextLookup)
         {
             _nextLookup = Time.unscaledTime + LookupIntervalSeconds;
+            Show(_bars, true);
             _bars = FindBars();
         }
 
         if (!hide && !_hidden)
             return;
-        foreach (var bar in _bars)
+        Show(_bars, !hide);
+        _hidden = hide;
+    }
+
+    private static void Show(Graphic[] bars, bool visible)
+    {
+        foreach (var bar in bars)
         {
             if (bar != null)
-                bar.enabled = !hide;
+                bar.enabled = visible;
         }
-        _hidden = hide;
     }
 
     private static Graphic[] FindBars()
     {
-        var root = GameObject.Find(BarsRoot);
-        if (root == null)
-            return System.Array.Empty<Graphic>();
-        var bars = new System.Collections.Generic.List<Graphic>();
-        foreach (var name in BarNames)
+        var bars = new List<Graphic>();
+        foreach (var graphic in UnityEngine.Object.FindObjectsByType<Graphic>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
-            var child = root.transform.Find(name);
-            var graphic = child != null ? child.GetComponent<Graphic>() : null;
-            if (graphic != null)
+            if (Array.IndexOf(BarNames, graphic.gameObject.name) >= 0)
                 bars.Add(graphic);
         }
         return bars.ToArray();
