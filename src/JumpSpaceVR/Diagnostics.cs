@@ -22,17 +22,37 @@ internal static partial class Diagnostics
         _frameTimeCount = Mathf.Min(_frameTimeCount + 1, FrameTimeSamples);
     }
 
-    private static string DescribeFrameTimes()
+    /// <summary>Average frames per second over the last few seconds, or null before any frame was recorded.</summary>
+    public static float? AverageFps
     {
-        if (_frameTimeCount == 0)
-            return "no samples";
+        get
+        {
+            if (_frameTimeCount == 0)
+                return null;
+            var (average, _) = FrameTimeStats();
+            return 1f / average;
+        }
+    }
+
+    /// <summary>Worst single frame time (milliseconds) over the last few seconds.</summary>
+    public static float? WorstFrameMs => _frameTimeCount == 0 ? null : FrameTimeStats().Worst * 1000f;
+
+    private static (float Average, float Worst) FrameTimeStats()
+    {
         float total = 0f, worst = 0f;
         for (var index = 0; index < _frameTimeCount; index++)
         {
             total += FrameTimes[index];
             worst = Mathf.Max(worst, FrameTimes[index]);
         }
-        var average = total / _frameTimeCount;
+        return (total / _frameTimeCount, worst);
+    }
+
+    private static string DescribeFrameTimes()
+    {
+        if (_frameTimeCount == 0)
+            return "no samples";
+        var (average, worst) = FrameTimeStats();
         return $"avg {average * 1000f:F1} ms ({1f / average:F0} fps), worst {worst * 1000f:F1} ms over {_frameTimeCount} frames";
     }
 
