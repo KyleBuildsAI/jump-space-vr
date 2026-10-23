@@ -102,8 +102,10 @@ function Install-OpenXRRuntime([string]$Game) {
 }
 
 function Install-Mod([string]$Game) {
-    $dist = Join-Path $RepoRoot 'dist'
-    if (-not $SkipBuild) {
+    # Release zips ship a prebuilt JumpSpaceVR.dll next to this script's folder; source checkouts build it.
+    $prebuilt = Join-Path $RepoRoot 'JumpSpaceVR.dll'
+    $dist = if (Test-Path $prebuilt) { $RepoRoot } else { Join-Path $RepoRoot 'dist' }
+    if (-not $SkipBuild -and -not (Test-Path $prebuilt)) {
         dotnet build (Join-Path $RepoRoot 'src\JumpSpaceVR\JumpSpaceVR.csproj') -c Release "-p:GamePath=$Game" -o $dist
         if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
     }
@@ -122,7 +124,8 @@ Write-Host "Game: $GamePath"
 
 Install-MelonLoader $GamePath
 Install-OpenXRRuntime $GamePath
-if (Test-Path (Join-Path $GamePath 'MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll')) {
+$hasPrebuilt = Test-Path (Join-Path $RepoRoot 'JumpSpaceVR.dll')
+if ($hasPrebuilt -or (Test-Path (Join-Path $GamePath 'MelonLoader\Il2CppAssemblies\Assembly-CSharp.dll'))) {
     Install-Mod $GamePath
 } else {
     Write-Warning 'MelonLoader has not generated game assemblies yet. Start the game once, close it, then run this script again.'

@@ -29,10 +29,15 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
 
 - Windows 10/11 and the Steam version of Jump Space.
 - A PC VR headset with an OpenXR runtime set as active (Virtual Desktop, SteamVR, Oculus/Meta Link, ...).
-- [.NET SDK 6.0 or newer](https://dotnet.microsoft.com/download) to build the mod.
+- [.NET SDK 6.0 or newer](https://dotnet.microsoft.com/download), only when building from source.
 - The game must run on **Direct3D 11**. If it starts on DirectX 12, add `-force-d3d11` to its Steam launch options.
 
 ## Install
+
+**From a release zip (no .NET SDK needed):** extract `JumpSpaceVR-<version>.zip`, close the game and double-click
+`Install.bat`. Then continue at step 4 below.
+
+**From source:**
 
 1. Close Jump Space.
 2. Run the installer from this folder:
@@ -141,6 +146,8 @@ The script:
   controllers driven through `XR_EXT_conformance_automation`;
 - prints the mod's log and any crash recorded by Windows;
 - restores your normal settings.
+
+`scripts\package.ps1` builds a release zip into `dist/`.
 
 `-RealRuntime` tests against your active runtime instead. `-RuntimeManifest <path>` tests against a specific
 runtime, for example SteamVR's `steamxr_win64.json` with its null driver enabled. That gives a real compositor
