@@ -137,12 +137,14 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\test-cycle.ps1 -Seconds 90
 
 The script:
 - rebuilds and deploys the mod;
-- launches the game through Steam against the mock runtime, with eye snapshots and synthetic controller input
-  turned on;
+- launches the game through Steam against the mock runtime, with eye snapshots turned on and simulated Touch
+  controllers driven through `XR_EXT_conformance_automation`;
 - prints the mod's log and any crash recorded by Windows;
 - restores your normal settings.
 
-`-RealRuntime` tests against your active runtime instead.
+`-RealRuntime` tests against your active runtime instead. `-RuntimeManifest <path>` tests against a specific
+runtime, for example SteamVR's `steamxr_win64.json` with its null driver enabled. That gives a real compositor
+with a simulated headset.
 
 `Jump Space VR mod research.md` contains the background feasibility research.
 
