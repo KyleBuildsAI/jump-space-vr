@@ -22,38 +22,50 @@ internal static partial class Diagnostics
         _frameTimeCount = Mathf.Min(_frameTimeCount + 1, FrameTimeSamples);
     }
 
-    /// <summary>The last N samples of a value, for measuring how sharply it changes.</summary>
+    /// <summary>The last N timed samples of a value, for measuring how abruptly it changes speed.</summary>
     public sealed class RollingSamples
     {
-        private readonly float[] _samples;
+        private readonly float[] _values;
+        private readonly float[] _times;
         private int _next;
         private int _count;
 
-        public RollingSamples(int size) => _samples = new float[size];
-
-        public void Add(float value)
+        public RollingSamples(int size)
         {
-            _samples[_next] = value;
-            _next = (_next + 1) % _samples.Length;
-            _count = Mathf.Min(_count + 1, _samples.Length);
+            _values = new float[size];
+            _times = new float[size];
+        }
+
+        public void Add(float value, float time)
+        {
+            _values[_next] = value;
+            _times[_next] = time;
+            _next = (_next + 1) % _values.Length;
+            _count = Mathf.Min(_count + 1, _values.Length);
         }
 
         /// <summary>
-        /// Largest change in per-frame movement (second difference) over the window: how sharply the value jolts.
-        /// Steady climbs and slopes score near zero; bob, stair steps and shake score high.
+        /// Largest change in speed between consecutive frames (units per second). Steady climbs, slopes and uneven
+        /// frame times score low; bob, stair steps and shake score high.
         /// </summary>
-        public float MaxSecondDifference
+        public float MaxSpeedChange
         {
             get
             {
-                var start = _count < _samples.Length ? 0 : _next;
+                var start = _count < _values.Length ? 0 : _next;
                 var worst = 0f;
-                for (var index = 2; index < _count; index++)
+                float? previousSpeed = null;
+                for (var index = 1; index < _count; index++)
                 {
-                    var a = _samples[(start + index - 2) % _samples.Length];
-                    var b = _samples[(start + index - 1) % _samples.Length];
-                    var c = _samples[(start + index) % _samples.Length];
-                    worst = Mathf.Max(worst, Mathf.Abs(c - 2f * b + a));
+                    var current = (start + index) % _values.Length;
+                    var previous = (start + index - 1) % _values.Length;
+                    var elapsed = _times[current] - _times[previous];
+                    if (elapsed <= 0f)
+                        continue;
+                    var speed = (_values[current] - _values[previous]) / elapsed;
+                    if (previousSpeed.HasValue)
+                        worst = Mathf.Max(worst, Mathf.Abs(speed - previousSpeed.Value));
+                    previousSpeed = speed;
                 }
                 return worst;
             }
