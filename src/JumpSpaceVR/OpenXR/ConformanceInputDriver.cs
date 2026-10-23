@@ -58,10 +58,14 @@ internal sealed unsafe class ConformanceInputDriver
         }
     }
 
+    private int _resolvedGeneration;
+
     private bool Resolve()
     {
-        if (_resolved)
+        if (_resolved && _resolvedGeneration == OpenXRHooks.Generation)
             return true;
+        _resolvedGeneration = OpenXRHooks.Generation;
+        _resolved = false;
 
         _stringToPath = (delegate* unmanaged<ulong, byte*, ulong*, int>)OpenXRHooks.Resolve("xrStringToPath");
         _setActive = (delegate* unmanaged<ulong, ulong, ulong, uint, int>)OpenXRHooks.Resolve("xrSetInputDeviceActiveEXT");

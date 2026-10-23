@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.1.3", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.1.4", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JumpSpaceVR;
@@ -81,6 +81,14 @@ public sealed class JumpSpaceVrMod : MelonMod
         _cameraRig.RestoreGamePose();
         HandleHotkeys();
         UpdateControllers();
+
+        // The runtime ended the session (headset disconnected, runtime closed): tear down and retry.
+        if (_runtime != null && _runtime.SessionLost)
+        {
+            Log.Warning("VR session ended by the runtime; waiting for the headset to come back.");
+            DisableVr();
+            _nextRetryTime = Time.realtimeSinceStartup + RetryIntervalSeconds;
+        }
 
         if (_frameCount == StartupDelayFrames && _vrRequested)
             EnableVr();
@@ -216,7 +224,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _stereoRenderer.LeftEyeCamera = null;
         _stereoRenderer.RightEyeCamera = null;
         _cameraRig.Release();
-        _runtime?.Stop();
+        _runtime?.Shutdown();
         Log.Msg("VR stopped.");
     }
 

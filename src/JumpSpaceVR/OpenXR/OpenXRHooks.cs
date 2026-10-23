@@ -77,6 +77,9 @@ internal static unsafe class OpenXRHooks
 
     private static delegate* unmanaged<ulong, byte*, IntPtr*, int> _nextGetInstanceProcAddr;
 
+    /// <summary>Incremented every time OpenXR is (re)loaded. Anything cached per instance must check it.</summary>
+    public static int Generation { get; private set; }
+
     /// <summary>The XrInstance handle Unity created (0 until known).</summary>
     public static ulong Instance { get; private set; }
 
@@ -110,6 +113,11 @@ internal static unsafe class OpenXRHooks
     /// <summary>Wraps the loader's xrGetInstanceProcAddr; pass the returned pointer to UnityOpenXR.</summary>
     public static IntPtr Wrap(IntPtr getInstanceProcAddr)
     {
+        // Each OpenXR load is a new generation: handles may repeat numerically across reloads, but every
+        // function pointer resolved for the previous generation points into an unloaded library.
+        Generation++;
+        Instance = 0;
+        Session = 0;
         _nextGetInstanceProcAddr = (delegate* unmanaged<ulong, byte*, IntPtr*, int>)getInstanceProcAddr;
         return Marshal.GetFunctionPointerForDelegate(GetInstanceProcAddrHook);
     }

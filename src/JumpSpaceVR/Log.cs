@@ -12,4 +12,5 @@ internal static class Log
     public static void Msg(string message) => _logger?.Msg(message);
     public static void Warning(string message) => _logger?.Warning(message);
     public static void Error(string message) => _logger?.Error(message);
+
 }

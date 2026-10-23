@@ -23,6 +23,7 @@ internal sealed class OpenXRRuntime
     private float _lastPollTime;
     private bool _initialized;
     private bool _startRequested;
+    private bool _shuttingDown;
 
     public bool IsInitialized => _initialized;
     public bool IsRendering => _subsystems.DisplayRunning;
@@ -31,6 +32,9 @@ internal sealed class OpenXRRuntime
 
     /// <summary>Suppresses repeated failure messages while the mod retries in the background.</summary>
     public bool QuietFailures { get; set; }
+
+    /// <summary>True once the runtime has ended the session (exit, loss); the owner should shut down.</summary>
+    public bool SessionLost { get; private set; }
 
     /// <summary>Developer option: request XR_EXT_conformance_automation to drive simulated controllers.</summary>
     public bool RequestConformanceAutomation { get; set; }
@@ -103,16 +107,38 @@ internal sealed class OpenXRRuntime
         StopInternal();
     }
 
+    /// <summary>
+    /// Ends the session the way OpenXR requires (request exit, let the runtime walk through STOPPING, where
+    /// the subsystems stop and xrEndSession is called, then IDLE/EXITING) and tears everything down.
+    /// </summary>
     public void Shutdown()
     {
-        Stop();
-        OpenXRNative.RequestExitSession();
+        if (!_initialized)
+            return;
+
+        _startRequested = false;
+        _shuttingDown = true;
+        if (_subsystems.DisplayRunning || _subsystems.InputRunning)
+        {
+            OpenXRNative.RequestExitSession();
+            for (var attempt = 0; attempt < ShutdownPumpAttempts && !IsEnded(_sessionState); attempt++)
+            {
+                PumpMessages(force: true);
+                System.Threading.Thread.Sleep(5);
+            }
+        }
+
+        // Covers runtimes that never reported STOPPING.
+        StopInternal();
         PumpMessages(force: true);
         _subsystems.Destroy();
         OpenXRNative.DestroySession();
         PumpMessages(force: true);
         OpenXRNative.UnloadOpenXRLibrary();
         _initialized = false;
+        _sessionState = NativeEvent.XrIdle;
+        _shuttingDown = false;
+        SessionLost = false;
         if (_instance == this)
             _instance = null;
     }
@@ -181,6 +207,11 @@ internal sealed class OpenXRRuntime
         OpenXRNative.SetApplicationInfo(Application.productName, Application.version, versionHash, Application.unityVersion);
     }
 
+    private const int ShutdownPumpAttempts = 100;
+
+    private static bool IsEnded(NativeEvent state) =>
+        state is NativeEvent.XrIdle or NativeEvent.XrExiting or NativeEvent.XrLossPending or NativeEvent.XrInstanceLossPending;
+
     private static bool IsIdleState(NativeEvent state) =>
         state is NativeEvent.XrIdle or NativeEvent.XrStopping or NativeEvent.XrExiting
             or NativeEvent.XrLossPending or NativeEvent.XrInstanceLossPending;
@@ -221,7 +252,9 @@ internal sealed class OpenXRRuntime
             case NativeEvent.XrExiting:
             case NativeEvent.XrLossPending:
             case NativeEvent.XrInstanceLossPending:
-                Log.Warning($"OpenXR runtime requested shutdown ({nativeEvent}). Press the VR toggle key to restart.");
+                // During our own Shutdown this is expected; otherwise the runtime ended the session.
+                if (!_shuttingDown)
+                    SessionLost = true;
                 break;
             case NativeEvent.XrRequestRestartLoop:
             case NativeEvent.XrRequestGetSystemLoop:

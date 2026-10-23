@@ -228,18 +228,30 @@ internal sealed unsafe class OpenXRControllers
     private delegate* unmanaged<ulong, XrActionStateGetInfo*, XrActionStateVector2f*, int> _getVector2;
 
     private readonly Dictionary<Action, ulong> _actions = new();
+    private int _generation;
     private ulong _actionSet;
     private ulong _attachedSession;
     private bool _setupFailed;
     private int _syncFailures;
 
-    public bool IsReady => _attachedSession != 0 && _attachedSession == OpenXRHooks.Session;
+    public bool IsReady => _attachedSession != 0 && _generation == OpenXRHooks.Generation && _attachedSession == OpenXRHooks.Session;
 
     /// <summary>Creates and attaches the action set. Must run after the session exists and before it begins.</summary>
     public bool Setup()
     {
         if (IsReady)
             return true;
+
+        // A new OpenXR instance (VR toggled or headset reconnected) invalidates all previous handles.
+        if (_generation != OpenXRHooks.Generation)
+        {
+            _generation = OpenXRHooks.Generation;
+            _actionSet = 0;
+            _actions.Clear();
+            _attachedSession = 0;
+            _setupFailed = false;
+        }
+
         if (_setupFailed || OpenXRHooks.Session == 0)
             return false;
 
