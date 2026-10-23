@@ -56,8 +56,6 @@ public sealed class JumpSpaceVrMod : MelonMod
         _config = new ModConfig();
         _vrRequested = _config.StartInVr.Value;
 
-        ApplyRuntimeOverride();
-
         var pluginsDirectory = Path.Combine(Application.dataPath, "Plugins", "x86_64");
         OpenXRNative.InstallResolver(pluginsDirectory);
 
@@ -80,22 +78,6 @@ public sealed class JumpSpaceVrMod : MelonMod
         _cameraRig.CameraChanged += () => _recenterPending = true;
 
         Log.Msg($"Loaded. Toggle VR: {_config.ToggleVrKey.Value}, recenter: {_config.RecenterKey.Value}, diagnostics: {_config.DiagnosticsKey.Value}.");
-    }
-
-    private void ApplyRuntimeOverride()
-    {
-        var runtimeJson = _config.OpenXRRuntimeJson.Value;
-        if (string.IsNullOrWhiteSpace(runtimeJson))
-            return;
-
-        if (!File.Exists(runtimeJson))
-        {
-            Log.Warning($"OpenXR runtime override not found: {runtimeJson}. Using the system runtime.");
-            return;
-        }
-
-        Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", runtimeJson);
-        Log.Msg($"Using OpenXR runtime override: {runtimeJson}");
     }
 
     public override void OnUpdate()
@@ -365,7 +347,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         {
             _runtime ??= new OpenXRRuntime { RequestConformanceAutomation = _config.MockControllerInput.Value };
             var renderMode = _config.SinglePassInstanced.Value ? StereoRenderMode.SinglePassInstanced : StereoRenderMode.MultiPass;
-            if (!_runtime.IsInitialized && !_runtime.Initialize(renderMode))
+            if (!_runtime.IsInitialized && !InitializeFirstWorkingRuntime(renderMode))
             {
                 // Usually the headset is not connected yet; keep trying so it can be connected after launch.
                 _nextRetryTime = Time.realtimeSinceStartup + RetryIntervalSeconds;
@@ -401,6 +383,27 @@ public sealed class JumpSpaceVrMod : MelonMod
             _vrRequested = false;
             Log.Error($"Failed to start VR: {exception}");
         }
+    }
+
+    /// <summary>
+    /// Tries each candidate runtime (the VR app that is running first, then the Windows default) until one has a
+    /// headset ready. Works for Steam Link and SteamVR, Virtual Desktop (VDXR or SteamVR mode) and Quest Link.
+    /// </summary>
+    private bool InitializeFirstWorkingRuntime(StereoRenderMode renderMode)
+    {
+        var candidates = RuntimeSelector.Candidates(_config.Runtime.Value, _config.OpenXRRuntimeJson.Value);
+        foreach (var candidate in candidates)
+        {
+            Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", candidate.ManifestPath);
+            if (_runtime.Initialize(renderMode))
+            {
+                Log.Msg($"Connected to OpenXR runtime: {candidate.Name}.");
+                return true;
+            }
+            if (!_runtime.QuietFailures)
+                Log.Msg($"No headset on {candidate.Name}.");
+        }
+        return false;
     }
 
     private void DisableVr()
