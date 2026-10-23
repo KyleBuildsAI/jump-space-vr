@@ -22,6 +22,7 @@ namespace JumpSpaceVR.Testing;
 ///   key 0x0D                                  virtual-key code sent to the game window
 ///   keyuntil 0x1B 3 cursorFree == 1 60        press a key every 3 s until the condition holds (timeout 60 s)
 ///   expect aimYawOffset == 30 3               metric, operator, value, tolerance (for ==)
+///   config StabilizeView false                change a mod setting for this run only (restored when it ends)
 ///   snapshot | diagnostics | recenter | log text | quit
 /// </summary>
 internal sealed class ScenarioRunner
@@ -162,6 +163,9 @@ internal sealed class ScenarioRunner
                 case "log":
                     Log.Msg("[scenario] " + step.Substring(4).Trim());
                     break;
+                case "config":
+                    _command($"config {parts[1]} {parts[2]}");
+                    break;
                 case "snapshot":
                 case "diagnostics":
                 case "recenter":
@@ -215,6 +219,7 @@ internal sealed class ScenarioRunner
         if (_finished)
             return;
         _finished = true;
+        _command("restore-config");
         Log.Msg($"[scenario] DONE passed={_passed} failed={_failed}");
     }
 

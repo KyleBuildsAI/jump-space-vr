@@ -40,6 +40,9 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VirtualMouse _mouse = new();
     private Vector2? _pointerScreen;
     private bool _pointerOwnsCursor;
+
+    // Eye height over the last ~1.5 s, so tests can measure sudden vertical view jolts (bob, steps, landing).
+    private readonly Diagnostics.RollingRange _eyeHeights = new(90);
     private CursorLockMode? _gameCursorLock;
     private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;
@@ -266,6 +269,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         return name switch
         {
             "fps" => Diagnostics.AverageFps,
+            "eyeJoltMm" => _eyeHeights.MaxSecondDifference * 1000f,
             "worstFrameMs" => Diagnostics.WorstFrameMs,
             "vrRendering" => _runtime != null && _runtime.IsRendering ? 1f : 0f,
             "inLevel" => IsInLevel() ? 1f : 0f,
@@ -324,6 +328,16 @@ public sealed class JumpSpaceVrMod : MelonMod
                 break;
             case "recenter":
                 _recenterPending = true;
+                break;
+            case "restore-config":
+                _config.RestoreTemporary();
+                break;
+            default:
+                var parts = command.Split(' ', 3);
+                if (parts.Length == 3 && parts[0] == "config")
+                    _config.SetTemporarily(parts[1], parts[2]);
+                else
+                    throw new ArgumentException($"unknown command '{command}'");
                 break;
         }
     }
@@ -607,6 +621,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
+                _eyeHeights.Add(_cameraRig.LeftEye.transform.position.y);
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;
                 _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.ViewRotation, headPosition, left.Rotation,
