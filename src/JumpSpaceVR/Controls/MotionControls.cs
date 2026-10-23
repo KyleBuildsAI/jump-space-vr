@@ -47,6 +47,9 @@ internal sealed class MotionControls
     /// <summary>Developer test aid: extra rotation applied to the pointer (simulated controllers never move).</summary>
     public static Quaternion DebugPointerRotation = Quaternion.identity;
 
+    /// <summary>Developer test aid: offset added to the hand position (simulated controllers sit at the head).</summary>
+    public static Vector3 DebugHandOffset = Vector3.zero;
+
     /// <summary>True while motion aiming drives the game this frame.</summary>
     public bool IsActive { get; private set; }
 
@@ -120,7 +123,7 @@ internal sealed class MotionControls
         _hasAimTarget = true;
 
         if (moveWeapon && hand.IsValid)
-            PlaceWeapon(viewOrigin + viewRotation * (hand.Position * worldScale), pointerRotation, weaponOffset);
+            PlaceWeapon(viewOrigin + viewRotation * ((hand.Position + DebugHandOffset) * worldScale), pointerRotation, weaponOffset);
         else
             RestoreWeapon();
     }

@@ -129,7 +129,12 @@ launch with the mod.
 ## Known issues
 
 - **Markers over objects and players.** These are drawn in screen space, so they sit on the UI panel and don't
-  line up exactly with the 3D objects they label.
+  line up exactly with the 3D objects they label. World-space markers are planned.
+- **Weapon in hand needs tuning per weapon.** The weapon is attached at the game's item attach point; use the
+  weapon offset sliders in the mod menu (Insert) if the grip sits wrong. Turn "Weapon in hand" off to keep the
+  game's own weapon placement.
+- **Room-scale movement.** Walking around your room moves your view, not your character. Use the left stick to
+  move the character.
 - **No controller vibration.** The game never sends rumble to gamepads, so there is nothing to forward.
 - **SteamVR overlays.** The SteamVR dashboard and overlay tools such as OVR Advanced Settings can take focus at
   startup. Close the dashboard if the game appears frozen in the headset.

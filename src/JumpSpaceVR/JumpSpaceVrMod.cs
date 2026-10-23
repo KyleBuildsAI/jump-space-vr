@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.1.4", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.2.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JumpSpaceVR;
@@ -63,7 +63,10 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         BuildModMenu();
         if (_config.DebugAimOffset.Value)
+        {
             MotionControls.DebugPointerRotation = Quaternion.Euler(-15f, 30f, 0f);
+            MotionControls.DebugHandOffset = new Vector3(0.25f, -0.3f, 0.45f);
+        }
         Diagnostics.DescribeMotion = () =>
         {
             var c = _lastControllerState;
