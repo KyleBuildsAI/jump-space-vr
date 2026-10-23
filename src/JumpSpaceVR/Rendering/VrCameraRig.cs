@@ -49,6 +49,11 @@ internal sealed class VrCameraRig
         if (_cameraTransform == null)
             return;
 
+        // Gameplay code (aim rays, on-screen markers, UI anchoring) must see the flat camera: screen-sized and
+        // with the game's own field of view, not the eye texture and asymmetric eye projection.
+        _camera.targetTexture = null;
+        _camera.ResetProjectionMatrix();
+
         // Only undo our offset if nothing else moved the camera since we applied it.
         if (_cameraTransform.localPosition == _appliedLocalPosition && _cameraTransform.localRotation == _appliedLocalRotation)
         {
