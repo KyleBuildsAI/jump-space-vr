@@ -103,7 +103,14 @@ function Get-VerifiedDownload([string]$Url, [string]$Destination, [string]$Expec
         Move-Item $partial $Destination -Force
     }
     if ($ExpectedSha1) {
-        $actual = (Get-FileHash -Path $Destination -Algorithm SHA1).Hash.ToLowerInvariant()
+        $sha1 = [System.Security.Cryptography.SHA1]::Create()
+        $stream = [System.IO.File]::OpenRead($Destination)
+        try {
+            $actual = [System.BitConverter]::ToString($sha1.ComputeHash($stream)).Replace('-', '').ToLowerInvariant()
+        } finally {
+            $stream.Dispose()
+            $sha1.Dispose()
+        }
         if ($actual -ne $ExpectedSha1.ToLowerInvariant()) {
             Remove-Item $Destination -Force
             throw "Checksum mismatch for $Destination (expected $ExpectedSha1, got $actual)."
