@@ -100,6 +100,16 @@ launch with the mod.
 - **Anything else.** Run `scripts\uninstall.ps1 -GamePath "<game folder>"`, then use Steam's *Verify integrity of
   game files* to return to the unmodded game.
 
+## Known issues
+
+- **Markers over objects and players.** These are drawn in screen space, so they sit on the UI panel and don't
+  line up exactly with the 3D objects they label.
+- **No controller vibration.** The game never sends rumble to gamepads, so there is nothing to forward.
+- **SteamVR overlays.** The SteamVR dashboard and overlay tools such as OVR Advanced Settings can take focus at
+  startup. Close the dashboard if the game appears frozen in the headset.
+- **Untested on hardware.** Validation so far used Unity's OpenXR mock runtime and SteamVR's null (simulated)
+  headset. Reports from real headsets are welcome; include the `F10` snapshots and `MelonLoader/Latest.log`.
+
 ## Play responsibly
 
 Jump Space has no kernel anti-cheat, and the developers have endorsed community mods. Even so:
