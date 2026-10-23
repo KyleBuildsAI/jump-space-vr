@@ -23,6 +23,14 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> LevelHorizon { get; }
     public MelonPreferences_Entry<bool> StereoWeapon { get; }
     public MelonPreferences_Entry<bool> StabilizeView { get; }
+    public MelonPreferences_Entry<bool> MotionControls { get; }
+    public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
+    public MelonPreferences_Entry<float> SnapTurnAngle { get; }
+    public MelonPreferences_Entry<float> SmoothTurnSpeed { get; }
+    public MelonPreferences_Entry<bool> WeaponInHand { get; }
+    public MelonPreferences_Entry<float> WeaponOffsetX { get; }
+    public MelonPreferences_Entry<float> WeaponOffsetY { get; }
+    public MelonPreferences_Entry<float> WeaponOffsetZ { get; }
     public MelonPreferences_Entry<float> RenderScale { get; }
     public MelonPreferences_Entry<bool> SinglePassInstanced { get; }
     public MelonPreferences_Entry<bool> MoveUiIntoVr { get; }
@@ -34,6 +42,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
     public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
     public MelonPreferences_Entry<bool> SyntheticControllers { get; }
+    public MelonPreferences_Entry<bool> DebugAimOffset { get; }
     public MelonPreferences_Entry<bool> MockControllerInput { get; }
 
     public ModConfig()
@@ -67,6 +76,17 @@ internal sealed class ModConfig
             "so the gun is not seen double.");
         StabilizeView = _category.CreateEntry("StabilizeView", true, "Stabilize view",
             "Remove head bob, recoil kick and knockback shake from the headset view.");
+        MotionControls = _category.CreateEntry("MotionControls", true, "Motion controls",
+            "Aim with the right controller and turn with the right stick. Off: controllers act as a plain gamepad.");
+        TurnMode = _category.CreateEntry("TurnMode", Controls.TurnMode.Snap, "Turn mode", "Snap or Smooth turning on the right stick.");
+        SnapTurnAngle = _category.CreateEntry("SnapTurnAngle", 45f, "Snap turn angle");
+        SmoothTurnSpeed = _category.CreateEntry("SmoothTurnSpeed", 120f, "Smooth turn speed (deg/s)");
+        WeaponInHand = _category.CreateEntry("WeaponInHand", true, "Weapon in hand",
+            "Move the first-person weapon to the right controller.");
+        WeaponOffsetX = _category.CreateEntry("WeaponOffsetX", 0f, "Weapon grip offset X (m)",
+            "Fine-tunes where the weapon sits in your hand, on top of the game's item attach point.");
+        WeaponOffsetY = _category.CreateEntry("WeaponOffsetY", 0f, "Weapon grip offset Y (m)");
+        WeaponOffsetZ = _category.CreateEntry("WeaponOffsetZ", 0f, "Weapon grip offset Z (m)");
         RenderScale = _category.CreateEntry("RenderScale", 1.0f, "Render scale",
             "Eye texture resolution multiplier (0.5 - 2.0). Lower it for performance.");
         SinglePassInstanced = _category.CreateEntry("SinglePassInstanced", false, "Single pass instanced",
@@ -88,6 +108,8 @@ internal sealed class ModConfig
             "Developer option: feed a fixed test input through the virtual gamepad when no controllers are active.");
         MockControllerInput = _category.CreateEntry("MockControllerInput", false, "Mock controller input",
             "Developer option: drive simulated controllers via XR_EXT_conformance_automation (Unity mock runtime only).");
+        DebugAimOffset = _category.CreateEntry("DebugAimOffset", false, "Debug aim offset",
+            "Developer option: turn the controller pointer 30 degrees right and 15 degrees up to test motion aiming.");
         SnapshotOnStartup = _category.CreateEntry("SnapshotOnStartup", false, "Snapshot on startup",
             "Developer option: save eye snapshots once, shortly after VR starts.");
     }

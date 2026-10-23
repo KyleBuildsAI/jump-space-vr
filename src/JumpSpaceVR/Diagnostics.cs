@@ -1,3 +1,4 @@
+
 using System.Text;
 using JumpSpaceVR.OpenXR;
 using UnityEngine;
@@ -34,6 +35,8 @@ internal static partial class Diagnostics
         var average = total / _frameTimeCount;
         return $"avg {average * 1000f:F1} ms ({1f / average:F0} fps), worst {worst * 1000f:F1} ms over {_frameTimeCount} frames";
     }
+
+    public static System.Func<string> DescribeMotion;
 
     public static void Dump(OpenXRRuntime runtime)
     {
@@ -87,6 +90,8 @@ internal static partial class Diagnostics
             Section(report, $"Components on {camera.name}", () => DescribeComponents(camera.gameObject));
 
         Section(report, "Look state", DescribeLookState);
+        if (DescribeMotion != null)
+            Section(report, "Motion", DescribeMotion);
         Section(report, "First-person layer", JumpSpaceVR.Rendering.FirstPersonRenderFix.DescribeFirstPersonObjects);
 
         report.AppendLine("-- Canvases (root) --");

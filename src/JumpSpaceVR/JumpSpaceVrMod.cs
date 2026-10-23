@@ -34,6 +34,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VrUi.UiCompositor _uiCompositor = new();
     private readonly VirtualGamepad _gamepad = new();
     private readonly VrUi.ModMenu _modMenu = new();
+    private readonly MotionControls _motion = new();
+    private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;
     private bool _menuChordFired;
     private const float MenuChordSeconds = 1f;
@@ -60,6 +62,13 @@ public sealed class JumpSpaceVrMod : MelonMod
             Log.Error($"UnityOpenXR.dll is missing from {pluginsDirectory}. Run scripts/install.ps1 again.");
 
         BuildModMenu();
+        if (_config.DebugAimOffset.Value)
+            MotionControls.DebugPointerRotation = Quaternion.Euler(-15f, 30f, 0f);
+        Diagnostics.DescribeMotion = () =>
+        {
+            var c = _lastControllerState;
+            return _motion.Describe() + $" rightHand={c.RightHand.IsValid}:{c.RightHand.Position} rightPointer={c.RightPointer.IsValid}";
+        };
 
         // A new level or camera means a new "forward"; line the headset up with where the player is looking.
         _cameraRig.CameraChanged += () => _recenterPending = true;
@@ -88,6 +97,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _frameCount++;
         Diagnostics.RecordFrame();
         _cameraRig.RestoreGamePose();
+        _motion.RestoreWeapon();
         HandleHotkeys();
         UpdateControllers();
 
@@ -128,6 +138,14 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
             value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
         _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
+        _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
+        _modMenu.AddChoice("Turn mode", _config.TurnMode);
+        _modMenu.AddNumber("Snap turn angle", _config.SnapTurnAngle, 15f, 15f, 90f, "0");
+        _modMenu.AddNumber("Smooth turn speed", _config.SmoothTurnSpeed, 15f, 30f, 360f, "0");
+        _modMenu.AddToggle("Weapon in hand", _config.WeaponInHand);
+        _modMenu.AddNumber("Weapon offset X (right)", _config.WeaponOffsetX, 0.01f, -0.5f, 0.5f, "0.00");
+        _modMenu.AddNumber("Weapon offset Y (up)", _config.WeaponOffsetY, 0.01f, -0.6f, 0.4f, "0.00");
+        _modMenu.AddNumber("Weapon offset Z (forward)", _config.WeaponOffsetZ, 0.01f, -0.3f, 0.8f, "0.00");
         _modMenu.AddAction("Recenter view", () => _recenterPending = true);
         _modMenu.AddAction("Close", () => _modMenu.Close());
     }
@@ -191,6 +209,10 @@ public sealed class JumpSpaceVrMod : MelonMod
         // Right stick click: a tap still reaches the game (briefly, on release); holding it opens the mod menu.
         var rightClickTap = ProcessMenuChord(state.RightStickClick && !state.LeftStickClick);
         state.RightStickClick = rightClickTap || (state.RightStickClick && state.LeftStickClick);
+
+        _motion.ProcessInput(ref state, _config.MotionControls.Value && !_modMenu.IsOpen, _config.TurnMode.Value,
+            _config.SnapTurnAngle.Value, _config.SmoothTurnSpeed.Value);
+        _lastControllerState = state;
 
         if (_modMenu.IsOpen)
         {
@@ -345,6 +367,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        _motion.Deactivate();
         FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
         _uiCompositor.Stop();
@@ -364,6 +387,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         _beforeRenderHooked = BeforeRenderHook.Install(HarmonyInstance, OnBeforeRender)
                               && StereoRenderer.InstallHooks(HarmonyInstance);
         FirstPersonRenderFix.InstallHooks(HarmonyInstance);
+        MotionControls.InstallHooks(HarmonyInstance);
+        _motion.Activate();
     }
 
 
@@ -381,6 +406,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             if (_recenterPending)
             {
                 _snapPanelToHead = true;
+                _resetBodyYaw = true;
                 _headTracker.Recenter();
                 _recenterPending = false;
             }
@@ -394,8 +420,15 @@ public sealed class JumpSpaceVrMod : MelonMod
             var positional = _config.PositionalTracking.Value;
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);
+            if (_resetBodyYaw && Camera.main != null)
+            {
+                _motion.Body.Reset(Camera.main.transform.eulerAngles.y);
+                _resetBodyYaw = false;
+            }
+            float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
+
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
-                    _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask))
+                    _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
@@ -405,6 +438,13 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _config.UiFollow.Value, _config.UiSmoothing.Value, _config.UiDistance.Value, _config.UiWidth.Value,
                     _snapPanelToHead);
                 _snapPanelToHead = false;
+
+                var controllers = _lastControllerState;
+                _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
+                    _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
+                    _config.WorldScale.Value,
+                    new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
+                    _config.WeaponInHand.Value);
             }
         }
         catch (Exception exception)

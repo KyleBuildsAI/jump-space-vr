@@ -31,6 +31,7 @@ internal sealed class VrCameraRig
     private static readonly string[] StableAnchorNames = { "CameraController", "CameraKnocker", "Crouch", "CameraRoot" };
     private const float AnchorOffsetSmoothingSeconds = 0.35f;
     private int _cameraInstanceId;
+    private int _parentInstanceId;
     private HDAdditionalCameraData _sourceData;
     private HDAdditionalCameraData _rightEyeData;
     private int _framesUntilSettingsSync;
@@ -87,7 +88,7 @@ internal sealed class VrCameraRig
     /// Call from the before-render hook, after all gameplay camera updates.
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
-        bool levelHorizon, bool stabilizeView, int extraCullingMask)
+        bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null)
     {
         if (!EnsureCameras())
             return false;
@@ -101,7 +102,10 @@ internal sealed class VrCameraRig
 
         // Letting the game's camera pitch and roll the headset view is a major cause of VR sickness; with
         // levelling on, only the game's yaw turns your view and your head does all looking up and down.
-        var viewRotation = levelHorizon ? Quaternion.Euler(0f, baseRotation.eulerAngles.y, 0f) : baseRotation;
+        // With motion controls the body yaw is owned by the mod, so aiming the gun never turns the view.
+        var viewRotation = bodyYaw.HasValue
+            ? Quaternion.Euler(0f, bodyYaw.Value, 0f)
+            : levelHorizon ? Quaternion.Euler(0f, baseRotation.eulerAngles.y, 0f) : baseRotation;
         ViewRotation = viewRotation;
 
         PlaceEye(_rightEye.transform, basePosition, viewRotation, right, worldScale);
@@ -196,7 +200,25 @@ internal sealed class VrCameraRig
 
         // Il2Cpp wrapper objects are not reference-stable, so compare engine instance IDs.
         if (mainCamera.GetInstanceID() != _cameraInstanceId || _rightEye == null)
+        {
             Adopt(mainCamera);
+        }
+        else
+        {
+            // The game re-parents the same camera between rigs (menu, cutscene, player, ship). That is a new
+            // "forward" and a new shake anchor, just like a different camera.
+            // The parent object itself may move with it, so compare the shake anchor above it instead.
+            var anchor = FindStableAnchor(_cameraTransform);
+            var parentId = anchor != null ? anchor.GetInstanceID() : 0;
+            if (parentId != _parentInstanceId)
+            {
+                _parentInstanceId = parentId;
+                _stableAnchor = anchor;
+                _hasSmoothedOffset = false;
+                Log.Msg($"Camera moved to a new rig (anchor: {(_stableAnchor != null ? _stableAnchor.name : "none")}).");
+                CameraChanged?.Invoke();
+            }
+        }
 
         return _cameraTransform != null && _rightEye != null;
     }
@@ -214,6 +236,7 @@ internal sealed class VrCameraRig
         _offsetApplied = false;
         _stableAnchor = FindStableAnchor(camera.transform);
         _hasSmoothedOffset = false;
+        _parentInstanceId = _stableAnchor != null ? _stableAnchor.GetInstanceID() : 0;
 
         // Unity's implicit XR camera tracking would fight the game's camera; we place the eyes ourselves.
         XRDevice.DisableAutoXRCameraTracking(camera, true);

@@ -66,6 +66,20 @@ internal sealed class HeadTracker
         return localized;
     }
 
+    /// <summary>Re-expresses a controller pose (tracking space) relative to the recentered origin.</summary>
+    public TrackedPose Localize(in TrackedPose raw, bool positionalTracking)
+    {
+        if (!raw.IsValid)
+            return raw;
+
+        var localized = raw;
+        // Without positional tracking the head is pinned, so hands are kept relative to the head instead.
+        var trackedPosition = positionalTracking ? raw.Position : raw.Position - _rawPosition + _originPosition;
+        localized.Position = _originYawInverse * (trackedPosition - _originPosition);
+        localized.Rotation = _originYawInverse * raw.Rotation;
+        return localized;
+    }
+
     private void SetOrigin(Vector3 rawPosition, Quaternion rawRotation)
     {
         var yaw = rawRotation.eulerAngles.y;

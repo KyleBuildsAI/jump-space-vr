@@ -18,7 +18,9 @@ param(
     # Use a specific OpenXR runtime manifest (e.g. SteamVR's steamxr_win64.json with its null driver).
     [string]$RuntimeManifest,
     # Skip the simulated controllers (they hold buttons down, which gets in the way of keyboard-driven tests).
-    [switch]$NoMockInput
+    [switch]$NoMockInput,
+    # Rotate the simulated pointer to verify motion aiming moves the game camera.
+    [switch]$DebugAim
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,9 +28,9 @@ $ErrorActionPreference = 'Stop'
 function Set-RuntimeOverride([string]$RuntimeJson, [bool]$DeveloperOptions) {
     $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
     # TOML literal string: backslashes in Windows paths need no escaping.
-    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $NoMockInput -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
+    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nDebugAimOffset = $(([string]($DeveloperOptions -and $DebugAim)).ToLower())`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $NoMockInput -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
     $content = if (Test-Path $configFile) { Get-Content $configFile -Raw } else { '' }
-    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers|MockControllerInput) = .*\r?\n?', '')
+    $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers|MockControllerInput|DebugAimOffset) = .*\r?\n?', '')
     if ($content -match '(?m)^OpenXRRuntimeJson = .*$') {
         $content = [regex]::Replace($content, '(?m)^OpenXRRuntimeJson = .*$', [System.Text.RegularExpressions.MatchEvaluator]{ param($m) $line })
     } elseif ($content -match '(?m)^\[JumpSpaceVR\]') {
