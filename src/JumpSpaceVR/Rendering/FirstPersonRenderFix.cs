@@ -4,6 +4,7 @@ using System.Text;
 using HarmonyLib;
 using Il2CppKeepsake;
 using UnityEngine;
+using UnityEngine.Rendering.HighDefinition;
 
 namespace JumpSpaceVR.Rendering;
 
@@ -18,16 +19,22 @@ namespace JumpSpaceVR.Rendering;
 internal static class FirstPersonRenderFix
 {
     private static bool _enabled;
+    private static bool _hooked;
     private static int _layerMask;
 
     public static bool Enabled => _enabled;
+
+    /// <summary>True once the game's weapon pass can be skipped; without it the fix stays off (no double weapon).</summary>
+    public static bool Hooked => _hooked;
 
     public static bool InstallHooks(HarmonyLib.Harmony harmony)
     {
         try
         {
-            var execute = AccessTools.Method(typeof(FirstPersonCamera), nameof(FirstPersonCamera.Execute));
+            // The base CustomPass declares more Execute overloads, so name the parameter list explicitly.
+            var execute = AccessTools.DeclaredMethod(typeof(FirstPersonCamera), nameof(FirstPersonCamera.Execute), new[] { typeof(CustomPassContext) });
             harmony.Patch(execute, prefix: new HarmonyMethod(typeof(FirstPersonRenderFix), nameof(ExecutePrefix)));
+            _hooked = true;
             return true;
         }
         catch (Exception exception)
@@ -39,6 +46,7 @@ internal static class FirstPersonRenderFix
 
     public static void Apply(bool enabled)
     {
+        enabled &= _hooked;
         if (enabled == _enabled)
             return;
         _enabled = enabled;
