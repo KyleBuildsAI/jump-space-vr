@@ -42,7 +42,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private bool _pointerOwnsCursor;
 
     // Eye height over the last ~1.5 s, so tests can measure sudden vertical view jolts (bob, steps, landing).
-    private readonly Diagnostics.RollingRange _eyeHeights = new(90);
+    private readonly Diagnostics.RollingSamples _eyeHeights = new(90);
     private CursorLockMode? _gameCursorLock;
     private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;

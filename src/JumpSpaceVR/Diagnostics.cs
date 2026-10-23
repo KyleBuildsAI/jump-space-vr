@@ -22,36 +22,20 @@ internal static partial class Diagnostics
         _frameTimeCount = Mathf.Min(_frameTimeCount + 1, FrameTimeSamples);
     }
 
-    /// <summary>The last N samples of a value, for measuring how much it wobbles.</summary>
-    public sealed class RollingRange
+    /// <summary>The last N samples of a value, for measuring how sharply it changes.</summary>
+    public sealed class RollingSamples
     {
         private readonly float[] _samples;
         private int _next;
         private int _count;
 
-        public RollingRange(int size) => _samples = new float[size];
+        public RollingSamples(int size) => _samples = new float[size];
 
         public void Add(float value)
         {
             _samples[_next] = value;
             _next = (_next + 1) % _samples.Length;
             _count = Mathf.Min(_count + 1, _samples.Length);
-        }
-
-        public float Range
-        {
-            get
-            {
-                if (_count == 0)
-                    return 0f;
-                float min = float.MaxValue, max = float.MinValue;
-                for (var index = 0; index < _count; index++)
-                {
-                    min = Mathf.Min(min, _samples[index]);
-                    max = Mathf.Max(max, _samples[index]);
-                }
-                return max - min;
-            }
         }
 
         /// <summary>
