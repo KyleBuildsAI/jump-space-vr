@@ -36,6 +36,36 @@ internal sealed class UiCompositor
     private Mesh _panelMesh;
     private CommandBuffer _uiCommands;
     private Matrix4x4 _panelMatrix = Matrix4x4.identity;
+    private Material _cursorMaterial;
+    private const float CursorDiameter = 0.018f;
+
+    /// <summary>Where the laser pointer touches the panel (0..1 UV, origin bottom-left), or null.</summary>
+    public Vector2? CursorUv { get; set; }
+
+    /// <summary>
+    /// Intersects a ray (world space) with the UI panel. Returns the hit as panel UV (0..1, origin bottom-left),
+    /// which maps directly to screen pixels of the game's UI.
+    /// </summary>
+    public bool TryHitPanel(Vector3 origin, Vector3 direction, out Vector2 uv)
+    {
+        uv = default;
+        if (!_running || !PanelEnabled)
+            return false;
+
+        var inverse = _panelMatrix.inverse;
+        var localOrigin = inverse.MultiplyPoint3x4(origin);
+        var localDirection = inverse.MultiplyVector(direction);
+        if (Mathf.Abs(localDirection.z) < 1e-5f)
+            return false;
+        var distance = -localOrigin.z / localDirection.z;
+        if (distance <= 0f)
+            return false;
+        var hit = localOrigin + localDirection * distance;
+        if (Mathf.Abs(hit.x) > 0.5f || Mathf.Abs(hit.y) > 0.5f)
+            return false;
+        uv = new Vector2(hit.x + 0.5f, hit.y + 0.5f);
+        return true;
+    }
     private bool _hasUiFrame;
     private bool _running;
     private object _coroutine;
@@ -161,6 +191,8 @@ internal sealed class UiCompositor
             commands.SetRenderTarget(eyeTargets[eye]);
             commands.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
             commands.DrawMesh(_panelMesh, _panelMatrix, _panelMaterial, 0, 0);
+            if (CursorUv.HasValue && _cursorMaterial != null)
+                commands.DrawMesh(_panelMesh, CursorMatrix(CursorUv.Value), _cursorMaterial, 0, 0);
         }
     }
 
@@ -209,6 +241,12 @@ internal sealed class UiCompositor
             _panelMaterial = new Material(shader) { name = "JumpSpaceVR_UiPanel" };
             _panelMaterial.SetInt("unity_GUIZTestMode", GuiZTestAlways);
             _panelMaterial.hideFlags = HideFlags.DontUnloadUnusedAsset;
+            _cursorMaterial = new Material(_panelMaterial)
+            {
+                name = "JumpSpaceVR_Cursor",
+                hideFlags = HideFlags.DontUnloadUnusedAsset,
+                mainTexture = CreateCursorTexture(),
+            };
             Log.Msg($"VR UI panel uses shader '{shader.name}'.");
         }
 
@@ -235,6 +273,39 @@ internal sealed class UiCompositor
         _uiTexture.Create();
         _panelMaterial.mainTexture = _uiTexture;
         _hasUiFrame = false;
+    }
+
+    private Matrix4x4 CursorMatrix(Vector2 uv)
+    {
+        var scale = _panelMatrix.lossyScale;
+        var local = Matrix4x4.TRS(new Vector3(uv.x - 0.5f, uv.y - 0.5f, -0.002f), Quaternion.identity,
+            new Vector3(CursorDiameter / Mathf.Max(scale.x, 0.01f), CursorDiameter / Mathf.Max(scale.y, 0.01f), 1f));
+        return _panelMatrix * local;
+    }
+
+    /// <summary>A soft white dot with a dark outline, readable on any background.</summary>
+    private static Texture2D CreateCursorTexture()
+    {
+        const int size = 32;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
+        {
+            name = "JumpSpaceVR_CursorDot",
+            hideFlags = HideFlags.DontUnloadUnusedAsset,
+            wrapMode = TextureWrapMode.Clamp,
+        };
+        for (var y = 0; y < size; y++)
+        {
+            for (var x = 0; x < size; x++)
+            {
+                var distance = new Vector2(x + 0.5f - size / 2f, y + 0.5f - size / 2f).magnitude / (size / 2f);
+                var color = distance < 0.7f ? Color.white
+                    : distance < 0.95f ? new Color(0.05f, 0.08f, 0.1f, 1f)
+                    : Color.clear;
+                texture.SetPixel(x, y, color);
+            }
+        }
+        texture.Apply(false, false);
+        return texture;
     }
 
     /// <summary>Unit quad centred on the origin, facing the camera that looks along +Z.</summary>

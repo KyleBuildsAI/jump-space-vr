@@ -26,6 +26,8 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
   - Grips map to LB/RB.
   - A/B/X/Y map to A/B/X/Y.
   - The left menu button maps to Start.
+- **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
+  controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal.
 - **Mod menu (Insert).** An in-headset settings menu. It covers UI follow mode and size, comfort options, turning,
   motion controls and weapon offsets.
 - **Comfort.**

@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.2.1", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.2.2", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JumpSpaceVR;
@@ -36,6 +36,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VrUi.ModMenu _modMenu = new();
     private readonly MotionControls _motion = new();
     private readonly RoomscaleLocomotion _roomscale = new();
+    private readonly VirtualMouse _mouse = new();
+    private Vector2? _pointerScreen;
     private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;
     private bool _menuChordFired;
@@ -143,6 +145,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
             value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
         _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
+        _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
         _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
         _modMenu.AddChoice("Turn mode", _config.TurnMode);
         _modMenu.AddNumber("Snap turn angle", _config.SnapTurnAngle, 15f, 15f, 90f, "0");
@@ -215,6 +218,13 @@ public sealed class JumpSpaceVrMod : MelonMod
         var rightClickTap = ProcessMenuChord(state.RightStickClick && !state.LeftStickClick);
         state.RightStickClick = rightClickTap || (state.RightStickClick && state.LeftStickClick);
 
+        // Laser pointer: while it touches the UI panel in a menu, the right trigger clicks instead of firing.
+        if (_pointerScreen.HasValue)
+        {
+            _mouse.Send(_pointerScreen.Value, state.RightTrigger > 0.5f);
+            state.RightTrigger = 0f;
+        }
+
         if (_config.RoomscaleWalking.Value && _config.PositionalTracking.Value && !_modMenu.IsOpen)
             state.LeftStick = _roomscale.AddWalkInput(state.LeftStick, _headTracker.LocalPosition);
 
@@ -243,6 +253,26 @@ public sealed class JumpSpaceVrMod : MelonMod
     }
 
     private bool _recenterChordHeld;
+
+    /// <summary>
+    /// Points the right controller at the UI panel while the game shows a free mouse cursor (menus, inventory,
+    /// pause). The hit drives a virtual mouse; gameplay (locked cursor) is unaffected.
+    /// </summary>
+    private void UpdateLaserPointer(in TrackedPose pointer)
+    {
+        _pointerScreen = null;
+        _uiCompositor.CursorUv = null;
+        if (!_config.LaserPointer.Value || !pointer.IsValid || Cursor.lockState == CursorLockMode.Locked)
+            return;
+
+        var origin = _cameraRig.GamePosition + _cameraRig.ViewRotation * (pointer.Position * _config.WorldScale.Value);
+        var direction = _cameraRig.ViewRotation * pointer.Rotation * Vector3.forward;
+        if (!_uiCompositor.TryHitPanel(origin, direction, out var uv))
+            return;
+
+        _uiCompositor.CursorUv = uv;
+        _pointerScreen = new Vector2(uv.x * Screen.width, uv.y * Screen.height);
+    }
     private ControllerState _lastControllerState;
     private float _menuPressedAt = -1f;
     private bool _menuHoldTriggered;
@@ -375,6 +405,8 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        _mouse.Remove();
+        _pointerScreen = null;
         _motion.Deactivate();
         FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
@@ -452,6 +484,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _headTracker.ShiftOrigin(roomscaleStep / Mathf.Max(0.01f, _config.WorldScale.Value));
 
                 var controllers = _lastControllerState;
+                UpdateLaserPointer(_headTracker.Localize(controllers.RightPointer, positional));
                 _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
                     _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
                     _config.WorldScale.Value,
