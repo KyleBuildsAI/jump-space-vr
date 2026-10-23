@@ -33,6 +33,10 @@ internal sealed class VrCameraRig
     private Quaternion _appliedLocalRotation;
 
     public Camera LeftEye => _camera;
+
+    /// <summary>World pose the game gave its camera this frame, before the head offset.</summary>
+    public Vector3 GamePosition { get; private set; }
+    public Quaternion GameRotation { get; private set; } = Quaternion.identity;
     public Camera RightEye => _rightEye;
 
     /// <summary>Call early in the frame, before gameplay scripts read the camera transform.</summary>
@@ -66,6 +70,8 @@ internal sealed class VrCameraRig
         _baseLocalRotation = _cameraTransform.localRotation;
         var basePosition = _cameraTransform.position;
         var baseRotation = _cameraTransform.rotation;
+        GamePosition = basePosition;
+        GameRotation = baseRotation;
 
         PlaceEye(_rightEye.transform, basePosition, baseRotation, right, worldScale);
         PlaceEye(_cameraTransform, basePosition, baseRotation, left, worldScale);

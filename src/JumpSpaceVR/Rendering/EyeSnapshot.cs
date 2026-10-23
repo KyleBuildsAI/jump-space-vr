@@ -10,7 +10,18 @@ namespace JumpSpaceVR.Rendering;
 /// </summary>
 internal static class EyeSnapshot
 {
-    public static void Save(RenderTexture left, RenderTexture right)
+    public static void Save(RenderTexture left, RenderTexture right) => Save(left, right, "eye");
+
+    public static void SaveSingle(RenderTexture texture, string label)
+    {
+        if (texture == null)
+            return;
+        var directory = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "JumpSpaceVR");
+        Directory.CreateDirectory(directory);
+        Write(texture, Path.Combine(directory, $"{label}-{DateTime.Now:yyyyMMdd-HHmmss}.bmp"));
+    }
+
+    public static void Save(RenderTexture left, RenderTexture right, string label)
     {
         if (left == null || right == null)
         {
@@ -21,8 +32,8 @@ internal static class EyeSnapshot
         var directory = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "JumpSpaceVR");
         Directory.CreateDirectory(directory);
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        Write(left, Path.Combine(directory, $"eye-left-{stamp}.bmp"));
-        Write(right, Path.Combine(directory, $"eye-right-{stamp}.bmp"));
+        Write(left, Path.Combine(directory, $"{label}-left-{stamp}.bmp"));
+        Write(right, Path.Combine(directory, $"{label}-right-{stamp}.bmp"));
         Log.Msg($"Saved eye snapshots to {directory}");
     }
 
@@ -37,12 +48,26 @@ internal static class EyeSnapshot
             readable.Apply(false, false);
             var pixels = readable.GetPixels32();
             WriteBitmap(path, source.width, source.height, pixels);
+            LogAlphaCoverage(Path.GetFileName(path), pixels);
         }
         finally
         {
             RenderTexture.active = previous;
             UnityEngine.Object.Destroy(readable);
         }
+    }
+
+    private static void LogAlphaCoverage(string name, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Color32> pixels)
+    {
+        var transparent = 0;
+        var step = Math.Max(1, pixels.Length / 20000);
+        var samples = 0;
+        for (var index = 0; index < pixels.Length; index += step, samples++)
+        {
+            if (pixels[index].a < 16)
+                transparent++;
+        }
+        Log.Msg($"{name}: {100f * transparent / Math.Max(1, samples):F1}% transparent");
     }
 
     private static void WriteBitmap(string path, int width, int height, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Color32> pixels)

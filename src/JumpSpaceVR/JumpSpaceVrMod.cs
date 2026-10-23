@@ -26,6 +26,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly HeadTracker _headTracker = new();
     private readonly VrCameraRig _cameraRig = new();
     private readonly StereoRenderer _stereoRenderer = new();
+    private readonly VrUi.UiCompositor _uiCompositor = new();
     private readonly HotkeyReader _hotkeys = new();
 
     private bool _vrRequested;
@@ -80,7 +81,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         {
             Diagnostics.Dump(_runtime);
             if (_config.SnapshotOnStartup.Value)
-                EyeSnapshot.Save(_stereoRenderer.LeftTexture, _stereoRenderer.RightTexture);
+                SaveSnapshots();
         }
     }
 
@@ -88,6 +89,13 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         DisableVr();
         _runtime?.Shutdown();
+    }
+
+    /// <summary>Saves what the headset receives (eye + UI panel), plus the raw UI capture.</summary>
+    private void SaveSnapshots()
+    {
+        EyeSnapshot.SaveSingle(_uiCompositor.UiTexture, "ui");
+        _stereoRenderer.CaptureSubmittedFrame((left, right) => EyeSnapshot.Save(left, right, "headset"));
     }
 
     private void HandleHotkeys()
@@ -105,7 +113,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             _recenterPending = true;
 
         if (_hotkeys.WasPressed(_config.SnapshotKey.Value))
-            EyeSnapshot.Save(_stereoRenderer.LeftTexture, _stereoRenderer.RightTexture);
+            SaveSnapshots();
 
         if (_hotkeys.WasPressed(_config.DiagnosticsKey.Value))
         {
@@ -140,6 +148,9 @@ public sealed class JumpSpaceVrMod : MelonMod
                 return;
             }
             _stereoRenderer.Activate(_runtime.Subsystems.Display);
+            _stereoRenderer.Ui = _uiCompositor;
+            _uiCompositor.PanelEnabled = _config.MoveUiIntoVr.Value;
+            _uiCompositor.Start();
         }
         catch (Exception exception)
         {
@@ -150,7 +161,9 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        _uiCompositor.Stop();
         _stereoRenderer.Deactivate();
+        _stereoRenderer.LeftEyeCamera = null;
         _stereoRenderer.RightEyeCamera = null;
         _cameraRig.Release();
         _runtime?.Stop();
@@ -204,7 +217,12 @@ public sealed class JumpSpaceVrMod : MelonMod
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value))
+            {
+                _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
+                _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
+                _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.GameRotation, _config.UiDistance.Value, _config.UiWidth.Value);
+            }
             Trace("done");
             _traceFrames--;
         }
