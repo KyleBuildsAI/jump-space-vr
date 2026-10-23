@@ -66,6 +66,8 @@ update if VR stops working.
 | `F7`, or click both thumbsticks | Recenter (sets your seated position and forward direction) |
 | `F9` | Write diagnostics to `MelonLoader/Latest.log` |
 | `F10` | Save what the headset sees to `UserData/JumpSpaceVR/*.bmp` |
+| `F5` / `F6` | UI panel smaller / larger (saved immediately) |
+| `F3` / `F4` | UI panel closer / further (saved immediately) |
 
 Mouse, keyboard and gamepads keep working while you play in VR.
 

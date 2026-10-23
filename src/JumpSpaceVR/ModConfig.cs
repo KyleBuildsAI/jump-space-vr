@@ -13,6 +13,10 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<KeyCode> RecenterKey { get; }
     public MelonPreferences_Entry<KeyCode> DiagnosticsKey { get; }
     public MelonPreferences_Entry<KeyCode> SnapshotKey { get; }
+    public MelonPreferences_Entry<KeyCode> UiSmallerKey { get; }
+    public MelonPreferences_Entry<KeyCode> UiLargerKey { get; }
+    public MelonPreferences_Entry<KeyCode> UiCloserKey { get; }
+    public MelonPreferences_Entry<KeyCode> UiFurtherKey { get; }
     public MelonPreferences_Entry<bool> PositionalTracking { get; }
     public MelonPreferences_Entry<float> WorldScale { get; }
     public MelonPreferences_Entry<float> RenderScale { get; }
@@ -39,6 +43,10 @@ internal sealed class ModConfig
             "Writes camera, canvas and XR state to the MelonLoader log.");
         SnapshotKey = _category.CreateEntry("SnapshotKey", KeyCode.F10, "Eye snapshot key",
             "Saves both eye images to UserData/JumpSpaceVR for troubleshooting.");
+        UiSmallerKey = _category.CreateEntry("UiSmallerKey", KeyCode.F5, "UI smaller key");
+        UiLargerKey = _category.CreateEntry("UiLargerKey", KeyCode.F6, "UI larger key");
+        UiCloserKey = _category.CreateEntry("UiCloserKey", KeyCode.F3, "UI closer key");
+        UiFurtherKey = _category.CreateEntry("UiFurtherKey", KeyCode.F4, "UI further key");
         PositionalTracking = _category.CreateEntry("PositionalTracking", true, "Positional tracking",
             "Apply headset translation (6DoF). Disable for rotation-only head tracking.");
         WorldScale = _category.CreateEntry("WorldScale", 1.0f, "World scale",
@@ -62,6 +70,13 @@ internal sealed class ModConfig
             "Developer option: drive simulated controllers via XR_EXT_conformance_automation (Unity mock runtime only).");
         SnapshotOnStartup = _category.CreateEntry("SnapshotOnStartup", false, "Snapshot on startup",
             "Developer option: save eye snapshots once, shortly after VR starts.");
+    }
+
+    /// <summary>Changes a UI panel setting in place and saves it, so adjustments survive restarts.</summary>
+    public void Adjust(MelonPreferences_Entry<float> entry, float factor, float min, float max)
+    {
+        entry.Value = Mathf.Clamp(entry.Value * factor, min, max);
+        _category.SaveToFile(false);
     }
 
     public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 2.0f);

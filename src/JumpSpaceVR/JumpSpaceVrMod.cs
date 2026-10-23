@@ -146,6 +146,25 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private bool _recenterChordHeld;
 
+    private void HandleUiAdjustKeys()
+    {
+        const float step = 1.1f;
+        var changed = true;
+        if (_hotkeys.WasPressed(_config.UiLargerKey.Value))
+            _config.Adjust(_config.UiWidth, step, 0.4f, 6f);
+        else if (_hotkeys.WasPressed(_config.UiSmallerKey.Value))
+            _config.Adjust(_config.UiWidth, 1f / step, 0.4f, 6f);
+        else if (_hotkeys.WasPressed(_config.UiFurtherKey.Value))
+            _config.Adjust(_config.UiDistance, step, 0.4f, 6f);
+        else if (_hotkeys.WasPressed(_config.UiCloserKey.Value))
+            _config.Adjust(_config.UiDistance, 1f / step, 0.4f, 6f);
+        else
+            changed = false;
+
+        if (changed)
+            Log.Msg($"UI panel: {_config.UiWidth.Value:F2} m wide at {_config.UiDistance.Value:F2} m.");
+    }
+
     private void HandleHotkeys()
     {
         if (_hotkeys.WasPressed(_config.ToggleVrKey.Value))
@@ -159,6 +178,8 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         if (_hotkeys.WasPressed(_config.RecenterKey.Value))
             _recenterPending = true;
+
+        HandleUiAdjustKeys();
 
         if (_hotkeys.WasPressed(_config.SnapshotKey.Value))
             SaveSnapshots();
