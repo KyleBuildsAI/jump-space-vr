@@ -66,6 +66,17 @@ internal sealed class HeadTracker
         return localized;
     }
 
+    /// <summary>
+    /// Moves the recentered origin by a distance given in the recentered (body) frame, e.g. after the character
+    /// walked to where the player physically stepped.
+    /// </summary>
+    public void ShiftOrigin(Vector3 localDelta)
+    {
+        if (!_hasOrigin)
+            return;
+        _originPosition += Quaternion.Inverse(_originYawInverse) * localDelta;
+    }
+
     /// <summary>Re-expresses a controller pose (tracking space) relative to the recentered origin.</summary>
     public TrackedPose Localize(in TrackedPose raw, bool positionalTracking)
     {

@@ -23,6 +23,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> LevelHorizon { get; }
     public MelonPreferences_Entry<bool> StereoWeapon { get; }
     public MelonPreferences_Entry<bool> StabilizeView { get; }
+    public MelonPreferences_Entry<bool> RoomscaleWalking { get; }
     public MelonPreferences_Entry<bool> MotionControls { get; }
     public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
     public MelonPreferences_Entry<float> SnapTurnAngle { get; }
@@ -87,6 +88,8 @@ internal sealed class ModConfig
             "Fine-tunes where the weapon sits in your hand, on top of the game's item attach point.");
         WeaponOffsetY = _category.CreateEntry("WeaponOffsetY", 0f, "Weapon grip offset Y (m)");
         WeaponOffsetZ = _category.CreateEntry("WeaponOffsetZ", 0f, "Weapon grip offset Z (m)");
+        RoomscaleWalking = _category.CreateEntry("RoomscaleWalking", false, "Room-scale walking",
+            "Experimental: when you physically step away from your character, the character walks after you.");
         RenderScale = _category.CreateEntry("RenderScale", 1.0f, "Render scale",
             "Eye texture resolution multiplier (0.5 - 2.0). Lower it for performance.");
         SinglePassInstanced = _category.CreateEntry("SinglePassInstanced", false, "Single pass instanced",

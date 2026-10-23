@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.2.0", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.2.1", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 
 namespace JumpSpaceVR;
@@ -35,6 +35,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VirtualGamepad _gamepad = new();
     private readonly VrUi.ModMenu _modMenu = new();
     private readonly MotionControls _motion = new();
+    private readonly RoomscaleLocomotion _roomscale = new();
     private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;
     private bool _menuChordFired;
@@ -137,6 +138,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Remove head bob and shake", _config.StabilizeView);
         _modMenu.AddToggle("Stereo weapon", _config.StereoWeapon);
         _modMenu.AddToggle("Positional tracking (6DoF)", _config.PositionalTracking);
+        _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
         _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
             value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
@@ -212,6 +214,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         // Right stick click: a tap still reaches the game (briefly, on release); holding it opens the mod menu.
         var rightClickTap = ProcessMenuChord(state.RightStickClick && !state.LeftStickClick);
         state.RightStickClick = rightClickTap || (state.RightStickClick && state.LeftStickClick);
+
+        if (_config.RoomscaleWalking.Value && _config.PositionalTracking.Value && !_modMenu.IsOpen)
+            state.LeftStick = _roomscale.AddWalkInput(state.LeftStick, _headTracker.LocalPosition);
 
         _motion.ProcessInput(ref state, _config.MotionControls.Value && !_modMenu.IsOpen, _config.TurnMode.Value,
             _config.SnapTurnAngle.Value, _config.SmoothTurnSpeed.Value);
@@ -408,6 +413,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             if (_recenterPending)
             {
+                _roomscale.Reset();
                 _snapPanelToHead = true;
                 _resetBodyYaw = true;
                 _headTracker.Recenter();
@@ -441,6 +447,9 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _config.UiFollow.Value, _config.UiSmoothing.Value, _config.UiDistance.Value, _config.UiWidth.Value,
                     _snapPanelToHead);
                 _snapPanelToHead = false;
+                var roomscaleStep = _roomscale.ConsumeCharacterStep(_cameraRig.GamePosition, _cameraRig.ViewRotation);
+                if (roomscaleStep != Vector3.zero)
+                    _headTracker.ShiftOrigin(roomscaleStep / Mathf.Max(0.01f, _config.WorldScale.Value));
 
                 var controllers = _lastControllerState;
                 _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
