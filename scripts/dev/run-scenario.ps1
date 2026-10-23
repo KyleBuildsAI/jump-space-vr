@@ -25,6 +25,13 @@ $scenarioPath = (Resolve-Path (Join-Path $RepoRoot $Scenario) -ErrorAction Silen
 if (-not $scenarioPath) { $scenarioPath = Resolve-Path $Scenario }
 $log = Join-Path $GamePath 'MelonLoader\Latest.log'
 
+# The game can save its settings mid-run (for example when a scenario changes one in the VR menu), which would write
+# the test runtime and developer options back to disk; remember the user's runtime and reset them afterwards.
+$configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
+$userRuntime = ''
+if ((Test-Path $configFile) -and ((Get-Content $configFile -Raw) -match "(?m)^OpenXRRuntimeJson = '(.*)'") -and
+    -not $Matches[1].Contains('mock-runtime')) { $userRuntime = $Matches[1] }
+
 & (Join-Path $PSScriptRoot 'test-cycle.ps1') -GamePath $GamePath -Seconds 5 -KeepRunning -NoMockInput -Scenario $scenarioPath | Out-Null
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -40,6 +47,7 @@ $results
 if (-not $done) { Write-Warning "Scenario did not finish within $TimeoutSeconds s." }
 
 if (-not $KeepRunning) { & (Join-Path $PSScriptRoot 'stop-game.ps1') | Out-Null }
+& (Join-Path $PSScriptRoot 'reset-dev-settings.ps1') -GamePath $GamePath -RuntimeJson $userRuntime
 
 $failed = ($results | Select-String 'FAIL').Count
 if (-not $done) { $failed++ }
