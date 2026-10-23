@@ -55,6 +55,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (!File.Exists(Path.Combine(pluginsDirectory, "UnityOpenXR.dll")))
             Log.Error($"UnityOpenXR.dll is missing from {pluginsDirectory}. Run scripts/install.ps1 again.");
 
+        // A new level or camera means a new "forward"; line the headset up with where the player is looking.
+        _cameraRig.CameraChanged += () => _recenterPending = true;
+
         Log.Msg($"Loaded. Toggle VR: {_config.ToggleVrKey.Value}, recenter: {_config.RecenterKey.Value}, diagnostics: {_config.DiagnosticsKey.Value}.");
     }
 
@@ -105,6 +108,12 @@ public sealed class JumpSpaceVrMod : MelonMod
         }
     }
 
+    public override void OnSceneWasInitialized(int buildIndex, string sceneName)
+    {
+        if (_vrRequested)
+            _recenterPending = true;
+    }
+
     public override void OnApplicationQuit()
     {
         DisableVr();
@@ -131,6 +140,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (!state.IsActive && _config.SyntheticControllers.Value)
             state = new ControllerState { IsActive = true, LeftStick = new Vector2(0.5f, 0f), RightTrigger = 1f, ButtonA = true };
 
+        state.Menu = ProcessMenuButton(state.Menu);
+
         var recenterChord = state.LeftStickClick && state.RightStickClick;
         if (recenterChord && !_recenterChordHeld)
             _recenterPending = true;
@@ -145,6 +156,39 @@ public sealed class JumpSpaceVrMod : MelonMod
     }
 
     private bool _recenterChordHeld;
+    private float _menuPressedAt = -1f;
+    private bool _menuHoldTriggered;
+    private float _menuTapReleaseUntil;
+    private const float MenuHoldSeconds = 1f;
+
+    /// <summary>
+    /// Holding the menu button recenters; a short tap still reaches the game as Start (sent briefly on release,
+    /// since a hold must not open the game's pause menu).
+    /// </summary>
+    private bool ProcessMenuButton(bool pressed)
+    {
+        var now = Time.unscaledTime;
+        if (pressed)
+        {
+            if (_menuPressedAt < 0f)
+            {
+                _menuPressedAt = now;
+                _menuHoldTriggered = false;
+            }
+            else if (!_menuHoldTriggered && now - _menuPressedAt >= MenuHoldSeconds)
+            {
+                _menuHoldTriggered = true;
+                _recenterPending = true;
+            }
+            return false;
+        }
+
+        if (_menuPressedAt >= 0f && !_menuHoldTriggered)
+            _menuTapReleaseUntil = now + 0.1f;
+        _menuPressedAt = -1f;
+        return now < _menuTapReleaseUntil;
+    }
+    private bool _snapPanelToHead = true;
 
     private void HandleUiAdjustKeys()
     {
@@ -272,6 +316,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             if (_recenterPending)
             {
+                _snapPanelToHead = true;
                 _headTracker.Recenter();
                 _recenterPending = false;
             }
@@ -284,12 +329,16 @@ public sealed class JumpSpaceVrMod : MelonMod
             var positional = _config.PositionalTracking.Value;
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);
-            if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value))
+            if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
+                    _config.LevelHorizon.Value))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
-                _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.GameRotation, _config.UiDistance.Value, _config.UiWidth.Value);
+                var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;
+                _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.ViewRotation, headPosition, left.Rotation,
+                    _config.UiDistance.Value, _config.UiWidth.Value, _snapPanelToHead);
+                _snapPanelToHead = false;
             }
         }
         catch (Exception exception)

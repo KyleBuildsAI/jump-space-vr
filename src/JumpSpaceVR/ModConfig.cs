@@ -19,6 +19,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<KeyCode> UiFurtherKey { get; }
     public MelonPreferences_Entry<bool> PositionalTracking { get; }
     public MelonPreferences_Entry<float> WorldScale { get; }
+    public MelonPreferences_Entry<bool> LevelHorizon { get; }
     public MelonPreferences_Entry<float> RenderScale { get; }
     public MelonPreferences_Entry<bool> SinglePassInstanced { get; }
     public MelonPreferences_Entry<bool> MoveUiIntoVr { get; }
@@ -51,14 +52,17 @@ internal sealed class ModConfig
             "Apply headset translation (6DoF). Disable for rotation-only head tracking.");
         WorldScale = _category.CreateEntry("WorldScale", 1.0f, "World scale",
             "Multiplier for headset translation. Raise it if the world feels too big.");
+        LevelHorizon = _category.CreateEntry("LevelHorizon", true, "Level horizon",
+            "Only the game's turning (yaw) moves your view; your head does all looking up and down. " +
+            "Strongly recommended for comfort.");
         RenderScale = _category.CreateEntry("RenderScale", 1.0f, "Render scale",
             "Eye texture resolution multiplier (0.5 - 2.0). Lower it for performance.");
         SinglePassInstanced = _category.CreateEntry("SinglePassInstanced", false, "Single pass instanced",
             "Experimental. Faster, but the game's shaders may not support it (black or one-eye rendering).");
         MoveUiIntoVr = _category.CreateEntry("MoveUiIntoVr", true, "Move UI into VR",
             "Re-render screen-space menus and HUD on a panel floating in front of you.");
-        UiDistance = _category.CreateEntry("UiDistance", 1.6f, "UI distance (m)");
-        UiWidth = _category.CreateEntry("UiWidth", 1.9f, "UI width (m)");
+        UiDistance = _category.CreateEntry("UiDistance", 1.8f, "UI distance (m)");
+        UiWidth = _category.CreateEntry("UiWidth", 2.4f, "UI width (m)");
         OpenXRRuntimeJson = _category.CreateEntry("OpenXRRuntimeJson", "", "OpenXR runtime override",
             "Optional path to an OpenXR runtime manifest (.json). Leave empty to use the system's active runtime.");
         ControllersAsGamepad = _category.CreateEntry("ControllersAsGamepad", true, "VR controllers as gamepad",

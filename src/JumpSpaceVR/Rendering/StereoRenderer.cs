@@ -192,7 +192,9 @@ internal sealed class StereoRenderer
 
             var destination = renderPass.renderTarget;
             var slice = Math.Max(destination.m_DepthSlice, 0);
-            _copyCommands.CopyTexture(new RenderTargetIdentifier(_eyeTextures[eye]), 0, destination, slice);
+            // A blit, not CopyTexture: Unity stores render textures bottom-up on D3D, while draws into the
+            // swapchain image use the top-down layout the compositor expects. A raw copy shows upside down.
+            _copyCommands.Blit(new RenderTargetIdentifier(_eyeTextures[eye]), destination, Vector2.one, Vector2.zero, 0, slice);
             _swapchainTargets[eye] = destination;
         }
 

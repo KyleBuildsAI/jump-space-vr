@@ -63,7 +63,7 @@ update if VR stops working.
 | Input | Action |
 | --- | --- |
 | `F8` | Toggle VR on/off |
-| `F7`, or click both thumbsticks | Recenter (sets your seated position and forward direction) |
+| `F7`, hold the left menu button for 1 s, or click both thumbsticks | Recenter: line up your view with where the player is looking. Also happens automatically on level loads and camera changes. |
 | `F9` | Write diagnostics to `MelonLoader/Latest.log` |
 | `F10` | Save what the headset sees to `UserData/JumpSpaceVR/*.bmp` |
 | `F5` / `F6` | UI panel smaller / larger (saved immediately) |

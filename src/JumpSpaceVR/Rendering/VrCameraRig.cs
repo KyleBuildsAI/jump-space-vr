@@ -34,9 +34,15 @@ internal sealed class VrCameraRig
 
     public Camera LeftEye => _camera;
 
+    /// <summary>Raised when the rig switches to a new game camera (level load, ship, cutscene).</summary>
+    public event System.Action CameraChanged;
+
     /// <summary>World pose the game gave its camera this frame, before the head offset.</summary>
     public Vector3 GamePosition { get; private set; }
     public Quaternion GameRotation { get; private set; } = Quaternion.identity;
+
+    /// <summary>Rotation the headset view is built on: the game's yaw only when the horizon is levelled.</summary>
+    public Quaternion ViewRotation { get; private set; } = Quaternion.identity;
     public Camera RightEye => _rightEye;
 
     /// <summary>Call early in the frame, before gameplay scripts read the camera transform.</summary>
@@ -66,7 +72,8 @@ internal sealed class VrCameraRig
     /// Positions both eye cameras. Eye poses are relative to the recentered tracking origin, in meters.
     /// Call from the before-render hook, after all gameplay camera updates.
     /// </summary>
-    public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale)
+    public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
+        bool levelHorizon)
     {
         if (!EnsureCameras())
             return false;
@@ -78,8 +85,13 @@ internal sealed class VrCameraRig
         GamePosition = basePosition;
         GameRotation = baseRotation;
 
-        PlaceEye(_rightEye.transform, basePosition, baseRotation, right, worldScale);
-        PlaceEye(_cameraTransform, basePosition, baseRotation, left, worldScale);
+        // Letting the game's camera pitch and roll the headset view is a major cause of VR sickness; with
+        // levelling on, only the game's yaw turns your view and your head does all looking up and down.
+        var viewRotation = levelHorizon ? Quaternion.Euler(0f, baseRotation.eulerAngles.y, 0f) : baseRotation;
+        ViewRotation = viewRotation;
+
+        PlaceEye(_rightEye.transform, basePosition, viewRotation, right, worldScale);
+        PlaceEye(_cameraTransform, basePosition, viewRotation, left, worldScale);
         _appliedLocalPosition = _cameraTransform.localPosition;
         _appliedLocalRotation = _cameraTransform.localRotation;
         _offsetApplied = true;
@@ -158,6 +170,7 @@ internal sealed class VrCameraRig
         _framesUntilSettingsSync = 0;
 
         Log.Msg($"Stereo cameras attached to '{camera.name}' (parent: {(camera.transform.parent != null ? camera.transform.parent.name : "none")}).");
+        CameraChanged?.Invoke();
     }
 
     private static void DestroyStaleEyes()

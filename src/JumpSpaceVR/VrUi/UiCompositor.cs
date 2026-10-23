@@ -20,8 +20,6 @@ internal sealed class UiCompositor
     private const int GuiZTestAlways = 8;
     private static readonly string[] PanelShaderCandidates = { "UI/Default", "Sprites/Default", "Unlit/Transparent" };
 
-    private static readonly Matrix4x4 SwapchainFlip = Matrix4x4.Scale(new Vector3(1f, SystemInfo.graphicsUVStartsAtTop ? -1f : 1f, 1f));
-
     private RenderTexture _uiTexture;
     private Material _panelMaterial;
     private Mesh _panelMesh;
@@ -35,12 +33,46 @@ internal sealed class UiCompositor
     public RenderTexture UiTexture => _uiTexture;
     public RenderTexture MirrorSource { get; set; }
 
-    /// <summary>Positions the panel relative to the game camera's pose (not the head), so you can look around it.</summary>
-    public void PlacePanel(Vector3 cameraPosition, Quaternion cameraRotation, float distance, float width)
+    private const float FollowStartAngle = 40f;
+    private const float FollowStopAngle = 2f;
+    private const float FollowSpeedDegrees = 220f;
+    private const float PanelDrop = 0.1f;
+
+    private float _panelYaw;
+    private bool _following;
+    private bool _hasPanelYaw;
+
+    /// <summary>
+    /// Places the panel in front of the player. It stays where it is while you glance around, and swings
+    /// back in front of you (yaw only) once you look more than <see cref="FollowStartAngle"/> degrees away.
+    /// Head pose is given in the view frame (the levelled game camera), so the panel also travels with the
+    /// player and turns with the game's camera.
+    /// </summary>
+    public void PlacePanel(Vector3 viewOrigin, Quaternion viewRotation, Vector3 headPosition, Quaternion headRotation,
+        float distance, float width, bool snapToHead)
     {
+        var headYaw = headRotation.eulerAngles.y;
+        if (!_hasPanelYaw || snapToHead)
+        {
+            _panelYaw = headYaw;
+            _hasPanelYaw = true;
+        }
+
+        var offset = Mathf.Abs(Mathf.DeltaAngle(_panelYaw, headYaw));
+        if (offset > FollowStartAngle)
+            _following = true;
+        if (_following)
+        {
+            _panelYaw = Mathf.MoveTowardsAngle(_panelYaw, headYaw, FollowSpeedDegrees * Time.unscaledDeltaTime);
+            if (Mathf.Abs(Mathf.DeltaAngle(_panelYaw, headYaw)) < FollowStopAngle)
+                _following = false;
+        }
+
+        var panelRotation = Quaternion.Euler(0f, _panelYaw, 0f);
+        var localCenter = headPosition + panelRotation * new Vector3(0f, -PanelDrop, distance);
         var aspect = Screen.width > 0 ? (float)Screen.height / Screen.width : 9f / 16f;
-        var center = cameraPosition + cameraRotation * new Vector3(0f, 0f, distance);
-        _panelMatrix = Matrix4x4.TRS(center, cameraRotation, new Vector3(width, width * aspect, 1f));
+        _panelMatrix = Matrix4x4.TRS(viewOrigin + viewRotation * localCenter, viewRotation * panelRotation,
+            new Vector3(width, width * aspect, 1f));
     }
 
     public void Start()
@@ -91,10 +123,8 @@ internal sealed class UiCompositor
             var camera = eyeCameras[eye];
             if (camera == null)
                 continue;
-            // Swapchain images are not Unity render textures, so Unity's usual render-to-texture Y flip is not
-            // applied when drawing into them. Flip here to match the eye images copied in from render textures.
             commands.SetRenderTarget(eyeTargets[eye]);
-            commands.SetViewProjectionMatrices(camera.worldToCameraMatrix, SwapchainFlip * camera.projectionMatrix);
+            commands.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
             commands.DrawMesh(_panelMesh, _panelMatrix, _panelMaterial, 0, 0);
         }
     }
