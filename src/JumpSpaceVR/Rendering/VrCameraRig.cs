@@ -16,10 +16,15 @@ namespace JumpSpaceVR.Rendering;
 internal sealed class VrCameraRig
 {
     private const string RightEyeName = "JumpSpaceVR_RightEye";
+    private const int SettingsSyncIntervalFrames = 15;
 
     private Camera _camera;
     private Transform _cameraTransform;
     private Camera _rightEye;
+    private int _cameraInstanceId;
+    private HDAdditionalCameraData _sourceData;
+    private HDAdditionalCameraData _rightEyeData;
+    private int _framesUntilSettingsSync;
 
     private bool _offsetApplied;
     private Vector3 _baseLocalPosition;
@@ -92,6 +97,9 @@ internal sealed class VrCameraRig
         _camera = null;
         _cameraTransform = null;
         _rightEye = null;
+        _cameraInstanceId = 0;
+        _sourceData = null;
+        _rightEyeData = null;
     }
 
     private static void PlaceEye(Transform eye, Vector3 basePosition, Quaternion baseRotation, in EyeView view, float worldScale)
@@ -105,7 +113,8 @@ internal sealed class VrCameraRig
         if (mainCamera == null)
             return false;
 
-        if (mainCamera != _camera || _rightEye == null)
+        // Il2Cpp wrapper objects are not reference-stable, so compare engine instance IDs.
+        if (mainCamera.GetInstanceID() != _cameraInstanceId || _rightEye == null)
             Adopt(mainCamera);
 
         return _cameraTransform != null && _rightEye != null;
@@ -116,8 +125,11 @@ internal sealed class VrCameraRig
         if (_camera != null)
             Release();
 
+        DestroyStaleEyes();
+
         _camera = camera;
         _cameraTransform = camera.transform;
+        _cameraInstanceId = camera.GetInstanceID();
         _offsetApplied = false;
 
         // Unity's implicit XR camera tracking would fight the game's camera; we place the eyes ourselves.
@@ -129,19 +141,33 @@ internal sealed class VrCameraRig
         _rightEye.CopyFrom(camera);
         XRDevice.DisableAutoXRCameraTracking(_rightEye, true);
 
-        var sourceData = camera.GetComponent<HDAdditionalCameraData>();
-        if (sourceData != null)
-        {
-            var rightData = rightEyeObject.AddComponent<HDAdditionalCameraData>();
-            sourceData.CopyTo(rightData);
-        }
+        _sourceData = camera.GetComponent<HDAdditionalCameraData>();
+        if (_sourceData != null)
+            _rightEyeData = rightEyeObject.AddComponent<HDAdditionalCameraData>();
+        _framesUntilSettingsSync = 0;
 
         Log.Msg($"Stereo cameras attached to '{camera.name}' (parent: {(camera.transform.parent != null ? camera.transform.parent.name : "none")}).");
     }
 
-    /// <summary>The game changes FOV, clip planes and culling at runtime (zoom, ship view, menus).</summary>
+    private static void DestroyStaleEyes()
+    {
+        GameObject stale;
+        while ((stale = GameObject.Find(RightEyeName)) != null)
+            Object.DestroyImmediate(stale);
+    }
+
+    /// <summary>
+    /// The game changes clip planes, culling, volume masks and anti-aliasing on its camera at runtime
+    /// (menus, ship view, settings), so the right eye is kept in sync with the left.
+    /// </summary>
     private void SyncRightEyeSettings()
     {
+        if (_sourceData != null && _rightEyeData != null && --_framesUntilSettingsSync <= 0)
+        {
+            _sourceData.CopyTo(_rightEyeData);
+            _framesUntilSettingsSync = SettingsSyncIntervalFrames;
+        }
+
         _rightEye.cullingMask = _camera.cullingMask;
         _rightEye.nearClipPlane = _camera.nearClipPlane;
         _rightEye.farClipPlane = _camera.farClipPlane;

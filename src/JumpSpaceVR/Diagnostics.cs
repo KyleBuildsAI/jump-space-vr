@@ -34,6 +34,9 @@ internal static class Diagnostics
                               $"mask=0x{camera.cullingMask:X8} fov={camera.fieldOfView:F1} near={camera.nearClipPlane}");
         }
 
+        foreach (var camera in Camera.allCameras)
+            Section(report, $"Components on {camera.name}", () => DescribeComponents(camera.gameObject));
+
         report.AppendLine("-- Canvases (root) --");
         foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
         {
@@ -56,6 +59,21 @@ internal static class Diagnostics
         {
             report.AppendLine($"{title}: unavailable ({exception.GetType().Name})");
         }
+    }
+
+    private static string DescribeComponents(GameObject gameObject)
+    {
+        var names = new StringBuilder();
+        foreach (var component in gameObject.GetComponents<Component>())
+            names.Append(component.GetIl2CppType().Name).Append(", ");
+
+        var hdData = gameObject.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>();
+        if (hdData != null)
+        {
+            names.Append($"| volumeMask=0x{hdData.volumeLayerMask.value:X8} anchor={(hdData.volumeAnchorOverride != null ? hdData.volumeAnchorOverride.name : "-")} " +
+                         $"aa={hdData.antialiasing} customFrameSettings={hdData.customRenderingSettings} dynRes={hdData.allowDynamicResolution}");
+        }
+        return names.ToString();
     }
 
     private static string PathOf(Transform transform)
