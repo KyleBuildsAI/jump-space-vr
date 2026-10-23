@@ -272,6 +272,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         return name switch
         {
             "fps" => Diagnostics.AverageFps,
+            "memoryMb" => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024f * 1024f),
             "eyeJolt" => _eyeHeights.MaxSpeedChange * 100f,
             "worstFrameMs" => Diagnostics.WorstFrameMs,
             "vrRendering" => _runtime != null && _runtime.IsRendering ? 1f : 0f,

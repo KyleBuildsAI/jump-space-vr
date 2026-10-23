@@ -212,11 +212,12 @@ It prints a `PASS`/`FAIL` line per check, and the exit code is the number of fai
 | `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits "Play Prologue"; a trigger click loads the prologue |
 | `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick; the trigger fires; at least 45 fps |
 | `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
+| `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
 `hand`, `input`, `key`, `keyuntil`, `expect`, `config` (changes a setting for that run only), `snapshot`,
-`diagnostics`, `recenter`, `log` and `quit`. Metrics such as `cameraYaw`, `aimYawOffset`, `laserU`, `cutscene`, `fps`
-and `eyeJolt` are defined in `JumpSpaceVrMod.ScenarioMetric`.
+`diagnostics`, `recenter`, `log` and `quit`. Metrics such as `cameraYaw`, `aimYawOffset`, `laserU`, `cutscene`, `fps`,
+`memoryMb` and `eyeJolt` are defined in `JumpSpaceVrMod.ScenarioMetric`.
 
 Other simulators, for checks the mock runtime can't do:
 - **SteamVR null driver**: real compositor, simulated headset (`test-cycle.ps1 -RuntimeManifest`). Add
