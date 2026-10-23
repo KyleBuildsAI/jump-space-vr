@@ -77,6 +77,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     public override void OnUpdate()
     {
         _frameCount++;
+        Diagnostics.RecordFrame();
         _cameraRig.RestoreGamePose();
         HandleHotkeys();
         UpdateControllers();

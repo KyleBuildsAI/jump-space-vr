@@ -8,11 +8,39 @@ namespace JumpSpaceVR;
 /// <summary>Dumps the state needed to debug VR issues into the MelonLoader log.</summary>
 internal static class Diagnostics
 {
+    private const int FrameTimeSamples = 240;
+    private static readonly float[] FrameTimes = new float[FrameTimeSamples];
+    private static int _frameTimeIndex;
+    private static int _frameTimeCount;
+
+    /// <summary>Records the last frame's duration; call once per frame.</summary>
+    public static void RecordFrame()
+    {
+        FrameTimes[_frameTimeIndex] = Time.unscaledDeltaTime;
+        _frameTimeIndex = (_frameTimeIndex + 1) % FrameTimeSamples;
+        _frameTimeCount = Mathf.Min(_frameTimeCount + 1, FrameTimeSamples);
+    }
+
+    private static string DescribeFrameTimes()
+    {
+        if (_frameTimeCount == 0)
+            return "no samples";
+        float total = 0f, worst = 0f;
+        for (var index = 0; index < _frameTimeCount; index++)
+        {
+            total += FrameTimes[index];
+            worst = Mathf.Max(worst, FrameTimes[index]);
+        }
+        var average = total / _frameTimeCount;
+        return $"avg {average * 1000f:F1} ms ({1f / average:F0} fps), worst {worst * 1000f:F1} ms over {_frameTimeCount} frames";
+    }
+
     public static void Dump(OpenXRRuntime runtime)
     {
         var report = new StringBuilder();
         report.AppendLine("==== JumpSpaceVR diagnostics ====");
         report.AppendLine($"Screen: {Screen.width}x{Screen.height}, Graphics: {SystemInfo.graphicsDeviceType}");
+        report.AppendLine($"Frame time: {DescribeFrameTimes()}");
         report.AppendLine($"OpenXR initialized: {runtime.IsInitialized}, session state: {runtime.SessionState}, rendering: {runtime.IsRendering}");
 
         Section(report, "XR settings", () =>
