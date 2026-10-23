@@ -265,6 +265,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         float? cameraPitch = camera != null ? -Mathf.DeltaAngle(0f, camera.transform.eulerAngles.x) : null;
         return name switch
         {
+            "fps" => Diagnostics.AverageFps,
+            "worstFrameMs" => Diagnostics.WorstFrameMs,
             "vrRendering" => _runtime != null && _runtime.IsRendering ? 1f : 0f,
             "inLevel" => IsInLevel() ? 1f : 0f,
             "cameraYaw" => cameraYaw,

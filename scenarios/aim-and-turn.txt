@@ -52,3 +52,9 @@ wait 0.3
 expect laserOnPanel == 0
 expect rightTrigger > 0.5
 input right.trigger 0
+
+# Frame rate in the level with both eyes rendering (mock runtime, so no compositor overhead). 45 fps is the floor
+# where Quest reprojection still feels acceptable; aim for the headset's refresh rate.
+wait 5
+expect fps > 45
+log frame time check done
