@@ -72,6 +72,12 @@ internal static partial class Diagnostics
         }
     }
 
+    private static float CanvasAlpha(Canvas canvas)
+    {
+        var group = canvas.GetComponent<CanvasGroup>();
+        return group != null ? group.alpha : 1f;
+    }
+
     /// <summary>Average frames per second over the last few seconds, or null before any frame was recorded.</summary>
     public static float? AverageFps
     {
@@ -184,7 +190,21 @@ internal static partial class Diagnostics
             if (!canvas.isRootCanvas)
                 continue;
             report.AppendLine($"  {PathOf(canvas.transform)} mode={canvas.renderMode} active={canvas.isActiveAndEnabled} " +
-                              $"camera={(canvas.worldCamera != null ? canvas.worldCamera.name : "-")} order={canvas.sortingOrder} layer={canvas.gameObject.layer}");
+                              $"camera={(canvas.worldCamera != null ? canvas.worldCamera.name : "-")} order={canvas.sortingOrder} layer={canvas.gameObject.layer} display={canvas.targetDisplay} alpha={CanvasAlpha(canvas):F2}");
+        }
+
+        // Wide, dark, opaque UI graphics: letterbox bars and fades that would cover the view on the VR panel.
+        report.AppendLine("-- Large opaque UI graphics --");
+        foreach (var graphic in Object.FindObjectsByType<UnityEngine.UI.Graphic>(FindObjectsSortMode.None))
+        {
+            if (!graphic.isActiveAndEnabled || graphic.color.a < 0.5f || graphic.canvas == null || graphic.canvas.renderMode != RenderMode.ScreenSpaceOverlay)
+                continue;
+            var rect = graphic.rectTransform.rect;
+            var scale = graphic.canvas.scaleFactor;
+            if (rect.width * scale < Screen.width * 0.8f)
+                continue;
+            report.AppendLine($"  {PathOf(graphic.transform)} size={rect.width * scale:F0}x{rect.height * scale:F0} color={graphic.color} " +
+                              $"canvasAlpha={CanvasAlpha(graphic.canvas.rootCanvas):F2}");
         }
 
         Log.Msg(report.ToString());

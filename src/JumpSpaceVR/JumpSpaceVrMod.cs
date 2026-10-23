@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.3.2", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.4.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -38,6 +38,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly MotionControls _motion = new();
     private readonly RoomscaleLocomotion _roomscale = new();
     private readonly VirtualMouse _mouse = new();
+    private readonly VrUi.CinematicBars _cinematicBars = new();
     private Vector2? _pointerScreen;
     private bool _pointerOwnsCursor;
 
@@ -99,6 +100,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         Diagnostics.RecordFrame();
         _cameraRig.RestoreGamePose();
         _motion.RestoreWeapon();
+        _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
         // After the restore, so scenario checks see the game's own camera rather than the headset view.
         if (_scenario != null && _runtime != null && _runtime.IsRendering)
             _scenario.Update();
@@ -139,6 +141,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Stereo weapon", _config.StereoWeapon);
         _modMenu.AddToggle("Positional tracking (6DoF)", _config.PositionalTracking);
         _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
+        _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
         _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
             value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
@@ -278,6 +281,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "bodyYaw" => _motion.Body.Yaw,
             "aimYawOffset" => cameraYaw.HasValue ? Mathf.DeltaAngle(_motion.Body.Yaw, cameraYaw.Value) : null,
             "motionActive" => _motion.IsActive ? 1f : 0f,
+            "letterboxVisible" => IsLetterboxVisible() ? 1f : 0f,
+            "weaponInHand" => _motion.WeaponInHand ? 1f : 0f,
+            "itemLocator" => _motion.HasItemLocator ? 1f : 0f,
+            "gripErrorCm" => _motion.LastGripError * 100f,
             "stereoWeapon" => FirstPersonRenderFix.Enabled ? 1f : 0f,
             "modMenuOpen" => _modMenu.IsOpen ? 1f : 0f,
             "cursorFree" => Cursor.lockState != CursorLockMode.Locked ? 1f : 0f,
@@ -298,6 +305,19 @@ public sealed class JumpSpaceVrMod : MelonMod
             "rightHandZ" => _lastControllerState.RightHand.Position.z,
             _ => null,
         };
+    }
+
+    private static bool IsLetterboxVisible()
+    {
+        var root = GameObject.Find("PF_FadeToBlackController(Clone)/PF_FadeToBlack");
+        if (root == null)
+            return false;
+        foreach (var graphic in root.GetComponentsInChildren<UnityEngine.UI.Graphic>())
+        {
+            if (graphic.isActiveAndEnabled && graphic.rectTransform.rect.height > 1f && graphic.color.a > 0.5f)
+                return true;
+        }
+        return false;
     }
 
     private static bool IsCutscenePlaying()

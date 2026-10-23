@@ -111,6 +111,7 @@ launch with the mod.
 | `MoveUiIntoVr` | `true` | Show the UI panel in the headset. |
 | `UiDistance` / `UiWidth` | `1.6` / `1.9` | UI panel distance and width, in meters. |
 | `ControllersAsGamepad` | `true` | Use VR controllers as a gamepad. |
+| `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
 
