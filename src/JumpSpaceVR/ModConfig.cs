@@ -163,6 +163,20 @@ internal sealed class ModConfig
         entry.BoxedValue = parsed;
     }
 
+    /// <summary>Test scenarios: a setting's current value as a number (bool 0/1, enum index), or null.</summary>
+    public float? ReadAsNumber(string name)
+    {
+        var value = _category.GetEntry(name)?.BoxedValue;
+        return value switch
+        {
+            bool flag => flag ? 1f : 0f,
+            float number => number,
+            int number => number,
+            Enum choice => Convert.ToInt32(choice, CultureInfo.InvariantCulture),
+            _ => null,
+        };
+    }
+
     public void RestoreTemporary()
     {
         foreach (var (name, original) in _temporaryOriginals)
