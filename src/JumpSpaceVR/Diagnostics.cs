@@ -6,7 +6,7 @@ using UnityEngine.XR;
 namespace JumpSpaceVR;
 
 /// <summary>Dumps the state needed to debug VR issues into the MelonLoader log.</summary>
-internal static class Diagnostics
+internal static partial class Diagnostics
 {
     private const int FrameTimeSamples = 240;
     private static readonly float[] FrameTimes = new float[FrameTimeSamples];
@@ -85,6 +85,9 @@ internal static class Diagnostics
 
         foreach (var camera in Camera.allCameras)
             Section(report, $"Components on {camera.name}", () => DescribeComponents(camera.gameObject));
+
+        Section(report, "Look state", DescribeLookState);
+        Section(report, "First-person layer", JumpSpaceVR.Rendering.FirstPersonRenderFix.DescribeFirstPersonObjects);
 
         report.AppendLine("-- Canvases (root) --");
         foreach (var canvas in Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))

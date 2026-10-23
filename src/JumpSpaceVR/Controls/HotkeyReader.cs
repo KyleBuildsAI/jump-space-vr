@@ -47,6 +47,21 @@ internal sealed class HotkeyReader
             return VirtualKeyA + (key - KeyCode.A);
         if (key >= KeyCode.Alpha0 && key <= KeyCode.Alpha9)
             return VirtualKey0 + (key - KeyCode.Alpha0);
-        return 0;
+        return key switch
+        {
+            KeyCode.UpArrow => 0x26,
+            KeyCode.DownArrow => 0x28,
+            KeyCode.LeftArrow => 0x25,
+            KeyCode.RightArrow => 0x27,
+            KeyCode.Return => 0x0D,
+            KeyCode.Escape => 0x1B,
+            KeyCode.Backspace => 0x08,
+            KeyCode.Insert => 0x2D,
+            KeyCode.Home => 0x24,
+            KeyCode.End => 0x23,
+            KeyCode.PageUp => 0x21,
+            KeyCode.PageDown => 0x22,
+            _ => 0,
+        };
     }
 }

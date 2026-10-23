@@ -6,6 +6,17 @@ using UnityEngine.Rendering;
 
 namespace JumpSpaceVR.VrUi;
 
+/// <summary>How the UI panel follows the player's head.</summary>
+internal enum UiFollowMode
+{
+    /// <summary>Stays in front of the body; only moves on recenter.</summary>
+    Fixed,
+    /// <summary>Stays put while you glance around, eases back in front when you look well away.</summary>
+    Lazy,
+    /// <summary>Follows your face (yaw and pitch) with adjustable smoothing; zero smoothing is head-locked.</summary>
+    Smooth,
+}
+
 /// <summary>
 /// Brings the game's flat UI (menus, HUD, dialogs) into the headset and keeps a desktop mirror.
 ///
@@ -33,47 +44,71 @@ internal sealed class UiCompositor
     public RenderTexture UiTexture => _uiTexture;
     public RenderTexture MirrorSource { get; set; }
 
-    private const float FollowStartAngle = 40f;
-    private const float FollowStopAngle = 2f;
-    private const float FollowSpeedDegrees = 220f;
+    private const float LazyStartAngle = 35f;
+    private const float LazyStopAngle = 1.5f;
+    private const float LazyEaseSeconds = 0.25f;
     private const float PanelDrop = 0.1f;
 
-    private float _panelYaw;
-    private bool _following;
-    private bool _hasPanelYaw;
+    private Quaternion _panelRotation = Quaternion.identity;
+    private Vector3 _panelHeadPosition;
+    private bool _lazyFollowing;
+    private bool _hasPanelPose;
 
     /// <summary>
-    /// Places the panel in front of the player. It stays where it is while you glance around, and swings
-    /// back in front of you (yaw only) once you look more than <see cref="FollowStartAngle"/> degrees away.
-    /// Head pose is given in the view frame (the levelled game camera), so the panel also travels with the
-    /// player and turns with the game's camera.
+    /// Places the panel. Head pose is given in the view frame (the levelled game camera), so in every mode the
+    /// panel travels with the player's body; the mode decides how it follows the head.
     /// </summary>
     public void PlacePanel(Vector3 viewOrigin, Quaternion viewRotation, Vector3 headPosition, Quaternion headRotation,
-        float distance, float width, bool snapToHead)
+        UiFollowMode mode, float smoothingSeconds, float distance, float width, bool snapToHead)
     {
-        var headYaw = headRotation.eulerAngles.y;
-        if (!_hasPanelYaw || snapToHead)
+        var headYawOnly = Quaternion.Euler(0f, headRotation.eulerAngles.y, 0f);
+        var target = mode == UiFollowMode.Smooth ? headRotation : headYawOnly;
+
+        if (!_hasPanelPose || snapToHead)
         {
-            _panelYaw = headYaw;
-            _hasPanelYaw = true;
+            _panelRotation = target;
+            _panelHeadPosition = headPosition;
+            _hasPanelPose = true;
+            _lazyFollowing = false;
         }
 
-        var offset = Mathf.Abs(Mathf.DeltaAngle(_panelYaw, headYaw));
-        if (offset > FollowStartAngle)
-            _following = true;
-        if (_following)
+        var deltaTime = Time.unscaledDeltaTime;
+        switch (mode)
         {
-            _panelYaw = Mathf.MoveTowardsAngle(_panelYaw, headYaw, FollowSpeedDegrees * Time.unscaledDeltaTime);
-            if (Mathf.Abs(Mathf.DeltaAngle(_panelYaw, headYaw)) < FollowStopAngle)
-                _following = false;
+            case UiFollowMode.Fixed:
+                break;
+
+            case UiFollowMode.Lazy:
+                if (Quaternion.Angle(_panelRotation, target) > LazyStartAngle)
+                    _lazyFollowing = true;
+                if (_lazyFollowing)
+                {
+                    _panelRotation = Quaternion.Slerp(_panelRotation, target, Blend(LazyEaseSeconds, deltaTime));
+                    if (Quaternion.Angle(_panelRotation, target) < LazyStopAngle)
+                        _lazyFollowing = false;
+                }
+                break;
+
+            case UiFollowMode.Smooth:
+                _panelRotation = smoothingSeconds <= 0f
+                    ? target
+                    : Quaternion.Slerp(_panelRotation, target, Blend(smoothingSeconds, deltaTime));
+                break;
         }
 
-        var panelRotation = Quaternion.Euler(0f, _panelYaw, 0f);
-        var localCenter = headPosition + panelRotation * new Vector3(0f, -PanelDrop, distance);
+        // Follow head translation smoothly too, so leaning does not leave the panel behind.
+        _panelHeadPosition = mode == UiFollowMode.Fixed
+            ? _panelHeadPosition
+            : Vector3.Lerp(_panelHeadPosition, headPosition, Blend(Mathf.Max(smoothingSeconds, 0.05f), deltaTime));
+
+        var localCenter = _panelHeadPosition + _panelRotation * new Vector3(0f, -PanelDrop, distance);
         var aspect = Screen.width > 0 ? (float)Screen.height / Screen.width : 9f / 16f;
-        _panelMatrix = Matrix4x4.TRS(viewOrigin + viewRotation * localCenter, viewRotation * panelRotation,
+        _panelMatrix = Matrix4x4.TRS(viewOrigin + viewRotation * localCenter, viewRotation * _panelRotation,
             new Vector3(width, width * aspect, 1f));
     }
+
+    /// <summary>Frame-rate independent exponential smoothing factor.</summary>
+    private static float Blend(float seconds, float deltaTime) => 1f - Mathf.Exp(-deltaTime / Mathf.Max(seconds, 0.0001f));
 
     public void Start()
     {

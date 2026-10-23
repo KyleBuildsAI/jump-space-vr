@@ -21,6 +21,15 @@ internal sealed class VrCameraRig
     private Camera _camera;
     private Transform _cameraTransform;
     private Camera _rightEye;
+    private Transform _stableAnchor;
+    private Vector3 _smoothedAnchorOffset;
+    private bool _hasSmoothedOffset;
+    private int _gameCullingMask;
+    private bool _cullingMaskChanged;
+
+    // Names of the game's camera-shake layers, outermost first; the view is anchored above them.
+    private static readonly string[] StableAnchorNames = { "CameraController", "CameraKnocker", "Crouch", "CameraRoot" };
+    private const float AnchorOffsetSmoothingSeconds = 0.35f;
     private int _cameraInstanceId;
     private HDAdditionalCameraData _sourceData;
     private HDAdditionalCameraData _rightEyeData;
@@ -59,6 +68,11 @@ internal sealed class VrCameraRig
         // with the game's own field of view, not the eye texture and asymmetric eye projection.
         _camera.targetTexture = null;
         _camera.ResetProjectionMatrix();
+        if (_cullingMaskChanged)
+        {
+            _camera.cullingMask = _gameCullingMask;
+            _cullingMaskChanged = false;
+        }
 
         // Only undo our offset if nothing else moved the camera since we applied it.
         if (_cameraTransform.localPosition == _appliedLocalPosition && _cameraTransform.localRotation == _appliedLocalRotation)
@@ -73,14 +87,14 @@ internal sealed class VrCameraRig
     /// Call from the before-render hook, after all gameplay camera updates.
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
-        bool levelHorizon)
+        bool levelHorizon, bool stabilizeView, int extraCullingMask)
     {
         if (!EnsureCameras())
             return false;
 
         _baseLocalPosition = _cameraTransform.localPosition;
         _baseLocalRotation = _cameraTransform.localRotation;
-        var basePosition = _cameraTransform.position;
+        var basePosition = stabilizeView ? StablePosition() : _cameraTransform.position;
         var baseRotation = _cameraTransform.rotation;
         GamePosition = basePosition;
         GameRotation = baseRotation;
@@ -95,6 +109,13 @@ internal sealed class VrCameraRig
         _appliedLocalPosition = _cameraTransform.localPosition;
         _appliedLocalRotation = _cameraTransform.localRotation;
         _offsetApplied = true;
+
+        _gameCullingMask = _camera.cullingMask;
+        if (extraCullingMask != 0 && (_gameCullingMask & extraCullingMask) != extraCullingMask)
+        {
+            _camera.cullingMask = _gameCullingMask | extraCullingMask;
+            _cullingMaskChanged = true;
+        }
 
         SyncRightEyeSettings();
         _camera.targetTexture = leftTarget;
@@ -123,6 +144,43 @@ internal sealed class VrCameraRig
         _cameraInstanceId = 0;
         _sourceData = null;
         _rightEyeData = null;
+    }
+
+    /// <summary>
+    /// The game camera hangs below head-bob, recoil and knockback transforms. Anchoring the view on the camera
+    /// controller above them, with the remaining offset low-pass filtered, keeps crouching and steady offsets
+    /// but removes the high-frequency shake that is nauseating in a headset.
+    /// </summary>
+    private Vector3 StablePosition()
+    {
+        if (_stableAnchor == null)
+            return _cameraTransform.position;
+
+        var offset = _stableAnchor.InverseTransformPoint(_cameraTransform.position);
+        if (!_hasSmoothedOffset)
+        {
+            _smoothedAnchorOffset = offset;
+            _hasSmoothedOffset = true;
+        }
+        else
+        {
+            var blend = 1f - Mathf.Exp(-Time.unscaledDeltaTime / AnchorOffsetSmoothingSeconds);
+            _smoothedAnchorOffset = Vector3.Lerp(_smoothedAnchorOffset, offset, blend);
+        }
+        return _stableAnchor.TransformPoint(_smoothedAnchorOffset);
+    }
+
+    private static Transform FindStableAnchor(Transform camera)
+    {
+        foreach (var name in StableAnchorNames)
+        {
+            for (var parent = camera.parent; parent != null; parent = parent.parent)
+            {
+                if (parent.name == name)
+                    return parent;
+            }
+        }
+        return null;
     }
 
     private static void PlaceEye(Transform eye, Vector3 basePosition, Quaternion baseRotation, in EyeView view, float worldScale)
@@ -154,6 +212,8 @@ internal sealed class VrCameraRig
         _cameraTransform = camera.transform;
         _cameraInstanceId = camera.GetInstanceID();
         _offsetApplied = false;
+        _stableAnchor = FindStableAnchor(camera.transform);
+        _hasSmoothedOffset = false;
 
         // Unity's implicit XR camera tracking would fight the game's camera; we place the eyes ourselves.
         XRDevice.DisableAutoXRCameraTracking(camera, true);

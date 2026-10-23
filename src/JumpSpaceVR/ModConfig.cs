@@ -13,6 +13,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<KeyCode> RecenterKey { get; }
     public MelonPreferences_Entry<KeyCode> DiagnosticsKey { get; }
     public MelonPreferences_Entry<KeyCode> SnapshotKey { get; }
+    public MelonPreferences_Entry<KeyCode> ModMenuKey { get; }
     public MelonPreferences_Entry<KeyCode> UiSmallerKey { get; }
     public MelonPreferences_Entry<KeyCode> UiLargerKey { get; }
     public MelonPreferences_Entry<KeyCode> UiCloserKey { get; }
@@ -20,11 +21,15 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> PositionalTracking { get; }
     public MelonPreferences_Entry<float> WorldScale { get; }
     public MelonPreferences_Entry<bool> LevelHorizon { get; }
+    public MelonPreferences_Entry<bool> StereoWeapon { get; }
+    public MelonPreferences_Entry<bool> StabilizeView { get; }
     public MelonPreferences_Entry<float> RenderScale { get; }
     public MelonPreferences_Entry<bool> SinglePassInstanced { get; }
     public MelonPreferences_Entry<bool> MoveUiIntoVr { get; }
     public MelonPreferences_Entry<float> UiDistance { get; }
     public MelonPreferences_Entry<float> UiWidth { get; }
+    public MelonPreferences_Entry<VrUi.UiFollowMode> UiFollow { get; }
+    public MelonPreferences_Entry<float> UiSmoothing { get; }
     public MelonPreferences_Entry<string> OpenXRRuntimeJson { get; }
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
     public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
@@ -44,6 +49,8 @@ internal sealed class ModConfig
             "Writes camera, canvas and XR state to the MelonLoader log.");
         SnapshotKey = _category.CreateEntry("SnapshotKey", KeyCode.F10, "Eye snapshot key",
             "Saves both eye images to UserData/JumpSpaceVR for troubleshooting.");
+        ModMenuKey = _category.CreateEntry("ModMenuKey", KeyCode.Insert, "Mod menu key",
+            "Opens the in-game VR settings menu (also: hold the right thumbstick click for one second).");
         UiSmallerKey = _category.CreateEntry("UiSmallerKey", KeyCode.F5, "UI smaller key");
         UiLargerKey = _category.CreateEntry("UiLargerKey", KeyCode.F6, "UI larger key");
         UiCloserKey = _category.CreateEntry("UiCloserKey", KeyCode.F3, "UI closer key");
@@ -55,6 +62,11 @@ internal sealed class ModConfig
         LevelHorizon = _category.CreateEntry("LevelHorizon", true, "Level horizon",
             "Only the game's turning (yaw) moves your view; your head does all looking up and down. " +
             "Strongly recommended for comfort.");
+        StereoWeapon = _category.CreateEntry("StereoWeapon", true, "Stereo weapon",
+            "Render the first-person weapon and arms with the eye cameras instead of the game's flat overlay pass, " +
+            "so the gun is not seen double.");
+        StabilizeView = _category.CreateEntry("StabilizeView", true, "Stabilize view",
+            "Remove head bob, recoil kick and knockback shake from the headset view.");
         RenderScale = _category.CreateEntry("RenderScale", 1.0f, "Render scale",
             "Eye texture resolution multiplier (0.5 - 2.0). Lower it for performance.");
         SinglePassInstanced = _category.CreateEntry("SinglePassInstanced", false, "Single pass instanced",
@@ -63,6 +75,10 @@ internal sealed class ModConfig
             "Re-render screen-space menus and HUD on a panel floating in front of you.");
         UiDistance = _category.CreateEntry("UiDistance", 1.8f, "UI distance (m)");
         UiWidth = _category.CreateEntry("UiWidth", 2.4f, "UI width (m)");
+        UiFollow = _category.CreateEntry("UiFollow", VrUi.UiFollowMode.Lazy, "UI follow mode",
+            "Fixed: stays in front of your body. Lazy: eases back in front when you look away. Smooth: follows your face.");
+        UiSmoothing = _category.CreateEntry("UiSmoothing", 0.12f, "UI smoothing (s)",
+            "How softly the panel follows in Smooth mode. 0 = rigidly locked to your view.");
         OpenXRRuntimeJson = _category.CreateEntry("OpenXRRuntimeJson", "", "OpenXR runtime override",
             "Optional path to an OpenXR runtime manifest (.json). Leave empty to use the system's active runtime.");
         ControllersAsGamepad = _category.CreateEntry("ControllersAsGamepad", true, "VR controllers as gamepad",

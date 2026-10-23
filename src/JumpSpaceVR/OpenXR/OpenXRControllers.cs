@@ -6,7 +6,15 @@ using UnityEngine;
 
 namespace JumpSpaceVR.OpenXR;
 
-/// <summary>Controller state for one frame, in gamepad terms.</summary>
+/// <summary>A tracked pose in the same tracking space as the eye views (Unity coordinates, meters).</summary>
+internal struct TrackedPose
+{
+    public bool IsValid;
+    public Vector3 Position;
+    public Quaternion Rotation;
+}
+
+/// <summary>Controller state for one frame, in gamepad terms, plus hand poses.</summary>
 internal struct ControllerState
 {
     public bool IsActive;
@@ -23,6 +31,14 @@ internal struct ControllerState
     public bool Menu;
     public bool LeftStickClick;
     public bool RightStickClick;
+
+    /// <summary>Where the hand holds things (palm).</summary>
+    public TrackedPose LeftHand;
+    public TrackedPose RightHand;
+
+    /// <summary>The pointing ray (from the front of the controller, along its forward).</summary>
+    public TrackedPose LeftPointer;
+    public TrackedPose RightPointer;
 }
 
 /// <summary>
@@ -42,12 +58,13 @@ internal sealed unsafe class OpenXRControllers
     private const int TypeSessionActionSetsAttachInfo = 60;
     private const int TypeActionsSyncInfo = 61;
 
-    private enum ActionType { Boolean = 1, Float = 2, Vector2 = 3 }
+    private enum ActionType { Boolean = 1, Float = 2, Vector2 = 3, Pose = 4 }
 
     private enum Action
     {
         LeftStick, RightStick, LeftTrigger, RightTrigger, LeftGrip, RightGrip,
         ButtonA, ButtonB, ButtonX, ButtonY, Menu, LeftStickClick, RightStickClick,
+        LeftGripPose, RightGripPose, LeftAimPose, RightAimPose,
     }
 
     private static readonly (Action Action, string Name, ActionType Type)[] ActionDefinitions =
@@ -65,6 +82,19 @@ internal sealed unsafe class OpenXRControllers
         (Action.Menu, "menu", ActionType.Boolean),
         (Action.LeftStickClick, "left_stick_click", ActionType.Boolean),
         (Action.RightStickClick, "right_stick_click", ActionType.Boolean),
+        (Action.LeftGripPose, "left_grip_pose", ActionType.Pose),
+        (Action.RightGripPose, "right_grip_pose", ActionType.Pose),
+        (Action.LeftAimPose, "left_aim_pose", ActionType.Pose),
+        (Action.RightAimPose, "right_aim_pose", ActionType.Pose),
+    };
+
+    /// <summary>Hand pose bindings shared by every interaction profile.</summary>
+    private static readonly (Action Action, string Path)[] PoseBindings =
+    {
+        (Action.LeftGripPose, "/user/hand/left/input/grip/pose"),
+        (Action.RightGripPose, "/user/hand/right/input/grip/pose"),
+        (Action.LeftAimPose, "/user/hand/left/input/aim/pose"),
+        (Action.RightAimPose, "/user/hand/right/input/aim/pose"),
     };
 
     /// <summary>Suggested bindings per interaction profile. Runtimes pick the profile matching the hardware.</summary>
@@ -226,6 +256,40 @@ internal sealed unsafe class OpenXRControllers
     private delegate* unmanaged<ulong, XrActionStateGetInfo*, XrActionStateBoolean*, int> _getBoolean;
     private delegate* unmanaged<ulong, XrActionStateGetInfo*, XrActionStateFloat*, int> _getFloat;
     private delegate* unmanaged<ulong, XrActionStateGetInfo*, XrActionStateVector2f*, int> _getVector2;
+    private delegate* unmanaged<ulong, XrActionSpaceCreateInfo*, ulong*, int> _createActionSpace;
+    private delegate* unmanaged<ulong, ulong, long, XrSpaceLocation*, int> _locateSpace;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrPosef
+    {
+        public float OrientationX, OrientationY, OrientationZ, OrientationW;
+        public float PositionX, PositionY, PositionZ;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrActionSpaceCreateInfo
+    {
+        public int Type;
+        public void* Next;
+        public ulong Action;
+        public ulong SubactionPath;
+        public XrPosef PoseInActionSpace;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrSpaceLocation
+    {
+        public int Type;
+        public void* Next;
+        public ulong LocationFlags;
+        public XrPosef Pose;
+    }
+
+    private const int TypeActionSpaceCreateInfo = 38;
+    private const int TypeSpaceLocation = 42;
+    private const ulong LocationOrientationValid = 0x1, LocationPositionValid = 0x2;
+
+    private readonly Dictionary<Action, ulong> _poseSpaces = new();
 
     private readonly Dictionary<Action, ulong> _actions = new();
     private int _generation;
@@ -248,6 +312,7 @@ internal sealed unsafe class OpenXRControllers
             _generation = OpenXRHooks.Generation;
             _actionSet = 0;
             _actions.Clear();
+            _poseSpaces.Clear();
             _attachedSession = 0;
             _setupFailed = false;
         }
@@ -265,7 +330,7 @@ internal sealed unsafe class OpenXRControllers
                 return false;
 
             foreach (var (profile, bindings) in Profiles)
-                SuggestBindings(instance, profile, bindings);
+                SuggestBindings(instance, profile, Concat(bindings, PoseBindings));
 
             var session = OpenXRHooks.Session;
             var actionSet = _actionSet;
@@ -280,6 +345,7 @@ internal sealed unsafe class OpenXRControllers
                 return Fail($"xrAttachSessionActionSets failed ({result})");
 
             _attachedSession = session;
+            CreatePoseSpaces(session);
             Log.Msg("VR controller input ready.");
             return true;
         }
@@ -320,6 +386,12 @@ internal sealed unsafe class OpenXRControllers
         state.Menu = ReadBoolean(Action.Menu, ref state.IsActive);
         state.LeftStickClick = ReadBoolean(Action.LeftStickClick, ref state.IsActive);
         state.RightStickClick = ReadBoolean(Action.RightStickClick, ref state.IsActive);
+
+        state.LeftHand = LocatePose(Action.LeftGripPose);
+        state.RightHand = LocatePose(Action.RightGripPose);
+        state.LeftPointer = LocatePose(Action.LeftAimPose);
+        state.RightPointer = LocatePose(Action.RightAimPose);
+        state.IsActive |= state.RightHand.IsValid || state.LeftHand.IsValid;
         return state;
     }
 
@@ -335,7 +407,10 @@ internal sealed unsafe class OpenXRControllers
         _getFloat = (delegate* unmanaged<ulong, XrActionStateGetInfo*, XrActionStateFloat*, int>)OpenXRHooks.Resolve("xrGetActionStateFloat");
         _getVector2 = (delegate* unmanaged<ulong, XrActionStateGetInfo*, XrActionStateVector2f*, int>)OpenXRHooks.Resolve("xrGetActionStateVector2f");
 
-        return _stringToPath != null && _createActionSet != null && _createAction != null && _suggestBindings != null
+        _createActionSpace = (delegate* unmanaged<ulong, XrActionSpaceCreateInfo*, ulong*, int>)OpenXRHooks.Resolve("xrCreateActionSpace");
+        _locateSpace = (delegate* unmanaged<ulong, ulong, long, XrSpaceLocation*, int>)OpenXRHooks.Resolve("xrLocateSpace");
+
+        return _createActionSpace != null && _locateSpace != null && _stringToPath != null && _createActionSet != null && _createAction != null && _suggestBindings != null
                && _attachActionSets != null && _syncActions != null && _getBoolean != null && _getFloat != null && _getVector2 != null;
     }
 
@@ -430,6 +505,58 @@ internal sealed unsafe class OpenXRControllers
             return Vector2.zero;
         anyActive |= state.IsActive != 0 || state.X != 0f || state.Y != 0f;
         return new Vector2(state.X, state.Y);
+    }
+
+    private static (Action Action, string Path)[] Concat((Action Action, string Path)[] first, (Action Action, string Path)[] second)
+    {
+        var all = new (Action Action, string Path)[first.Length + second.Length];
+        first.CopyTo(all, 0);
+        second.CopyTo(all, first.Length);
+        return all;
+    }
+
+    private void CreatePoseSpaces(ulong session)
+    {
+        foreach (var (action, _) in PoseBindings)
+        {
+            var info = new XrActionSpaceCreateInfo
+            {
+                Type = TypeActionSpaceCreateInfo,
+                Action = _actions[action],
+                PoseInActionSpace = new XrPosef { OrientationW = 1f },
+            };
+            ulong space;
+            var result = _createActionSpace(session, &info, &space);
+            if (result == XrSuccess)
+                _poseSpaces[action] = space;
+            else
+                Log.Warning($"Could not create a pose space for {action} ({result}).");
+        }
+    }
+
+    /// <summary>Locates a controller pose in the eye-view space at the frame's predicted display time.</summary>
+    private TrackedPose LocatePose(Action action)
+    {
+        var baseSpace = OpenXRHooks.ViewSpace;
+        var time = OpenXRHooks.DisplayTime;
+        if (baseSpace == 0 || time == 0 || !_poseSpaces.TryGetValue(action, out var space))
+            return default;
+
+        var location = new XrSpaceLocation { Type = TypeSpaceLocation };
+        if (_locateSpace(space, baseSpace, time, &location) != XrSuccess)
+            return default;
+
+        const ulong required = LocationOrientationValid | LocationPositionValid;
+        if ((location.LocationFlags & required) != required)
+            return default;
+
+        var pose = location.Pose;
+        return new TrackedPose
+        {
+            IsValid = true,
+            Position = new Vector3(pose.PositionX, pose.PositionY, -pose.PositionZ),
+            Rotation = new Quaternion(-pose.OrientationX, -pose.OrientationY, pose.OrientationZ, pose.OrientationW),
+        };
     }
 
     private static void CopyString(string value, byte* destination, int capacity)

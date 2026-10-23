@@ -16,7 +16,9 @@ param(
     [switch]$KeepRunning,
     [switch]$RealRuntime,
     # Use a specific OpenXR runtime manifest (e.g. SteamVR's steamxr_win64.json with its null driver).
-    [string]$RuntimeManifest
+    [string]$RuntimeManifest,
+    # Skip the simulated controllers (they hold buttons down, which gets in the way of keyboard-driven tests).
+    [switch]$NoMockInput
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,7 +26,7 @@ $ErrorActionPreference = 'Stop'
 function Set-RuntimeOverride([string]$RuntimeJson, [bool]$DeveloperOptions) {
     $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
     # TOML literal string: backslashes in Windows paths need no escaping.
-    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
+    $line = "OpenXRRuntimeJson = '$RuntimeJson'`r`nSnapshotOnStartup = $(([string]$DeveloperOptions).ToLower())`r`nSyntheticControllers = false`r`nMockControllerInput = $(([string]($DeveloperOptions -and -not $NoMockInput -and -not $RuntimeJson.Contains('SteamVR'))).ToLower())"
     $content = if (Test-Path $configFile) { Get-Content $configFile -Raw } else { '' }
     $content = [regex]::Replace($content, '(?m)^(SnapshotOnStartup|SyntheticControllers|MockControllerInput) = .*\r?\n?', '')
     if ($content -match '(?m)^OpenXRRuntimeJson = .*$') {
@@ -45,6 +47,11 @@ Start-Sleep -Seconds 2
 dotnet build (Join-Path $RepoRoot 'src\JumpSpaceVR\JumpSpaceVR.csproj') -c Release "-p:GamePath=$GamePath" -o (Join-Path $RepoRoot 'dist') -v quiet -nologo | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 Copy-Item (Join-Path $RepoRoot 'dist\JumpSpaceVR.dll') (Join-Path $GamePath 'Mods') -Force
+
+# Remember the user's own runtime override so it can be put back afterwards.
+$userConfig = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
+$userRuntime = ''
+if ((Test-Path $userConfig) -and ((Get-Content $userConfig -Raw) -match "(?m)^OpenXRRuntimeJson = '(.*)'")) { $userRuntime = $Matches[1] }
 
 $runtimeJson = ''
 if ($RuntimeManifest) { $runtimeJson = $RuntimeManifest }
@@ -70,7 +77,7 @@ foreach ($crash in $crashes) {
 
 # The game has read its config already; put the user's settings back to normal (real headset, no dev options).
 # The game is killed rather than closed by stop-game.ps1, so it will not write its in-memory copy back.
-Set-RuntimeOverride '' $false
+Set-RuntimeOverride $userRuntime $false
 
 if (-not $KeepRunning) {
     & (Join-Path $PSScriptRoot 'stop-game.ps1') | Out-Null

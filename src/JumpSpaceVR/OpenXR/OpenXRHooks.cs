@@ -77,6 +77,15 @@ internal static unsafe class OpenXRHooks
 
     private static delegate* unmanaged<ulong, byte*, IntPtr*, int> _nextGetInstanceProcAddr;
 
+    private static long _displayTime;
+    private static long _viewSpace;
+
+    /// <summary>Predicted display time of the frame being rendered (from the latest xrLocateViews call).</summary>
+    public static long DisplayTime => Volatile.Read(ref _displayTime);
+
+    /// <summary>The XrSpace Unity locates the eye views in; controller poses are located in it too.</summary>
+    public static ulong ViewSpace => (ulong)Volatile.Read(ref _viewSpace);
+
     /// <summary>Incremented every time OpenXR is (re)loaded. Anything cached per instance must check it.</summary>
     public static int Generation { get; private set; }
 
@@ -118,6 +127,8 @@ internal static unsafe class OpenXRHooks
         Generation++;
         Instance = 0;
         Session = 0;
+        _viewSpace = 0;
+        _displayTime = 0;
         _nextGetInstanceProcAddr = (delegate* unmanaged<ulong, byte*, IntPtr*, int>)getInstanceProcAddr;
         return Marshal.GetFunctionPointerForDelegate(GetInstanceProcAddrHook);
     }
@@ -162,6 +173,13 @@ internal static unsafe class OpenXRHooks
         var result = _originalLocateViews(session, locateInfo, viewState, capacity, countOutput, views);
         if (result != XrSuccess || views == null || capacity < 2 || countOutput == null || *countOutput < 2 || viewState == null)
             return result;
+
+        // XrViewLocateInfo: type, next, viewConfigurationType, displayTime (offset 24), space (offset 32).
+        if (locateInfo != null)
+        {
+            Volatile.Write(ref _displayTime, *(long*)((byte*)locateInfo + 24));
+            Volatile.Write(ref _viewSpace, *(long*)((byte*)locateInfo + 32));
+        }
 
         const ulong required = OrientationValidBit | PositionValidBit;
         if ((viewState->ViewStateFlags & required) != required)

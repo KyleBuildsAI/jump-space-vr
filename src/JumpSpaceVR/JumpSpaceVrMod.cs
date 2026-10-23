@@ -33,6 +33,10 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly StereoRenderer _stereoRenderer = new();
     private readonly VrUi.UiCompositor _uiCompositor = new();
     private readonly VirtualGamepad _gamepad = new();
+    private readonly VrUi.ModMenu _modMenu = new();
+    private float _menuChordStart = -1f;
+    private bool _menuChordFired;
+    private const float MenuChordSeconds = 1f;
     private readonly ConformanceInputDriver _mockInput = new();
     private readonly HotkeyReader _hotkeys = new();
 
@@ -54,6 +58,8 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         if (!File.Exists(Path.Combine(pluginsDirectory, "UnityOpenXR.dll")))
             Log.Error($"UnityOpenXR.dll is missing from {pluginsDirectory}. Run scripts/install.ps1 again.");
+
+        BuildModMenu();
 
         // A new level or camera means a new "forward"; line the headset up with where the player is looking.
         _cameraRig.CameraChanged += () => _recenterPending = true;
@@ -108,6 +114,45 @@ public sealed class JumpSpaceVrMod : MelonMod
         }
     }
 
+    private void BuildModMenu()
+    {
+        _modMenu.AddChoice("UI follow mode", _config.UiFollow, _ => _snapPanelToHead = true);
+        _modMenu.AddNumber("UI smoothing (s)", _config.UiSmoothing, 0.02f, 0f, 1f, "0.00");
+        _modMenu.AddNumber("UI size (m)", _config.UiWidth, 0.1f, 0.6f, 6f, "0.0");
+        _modMenu.AddNumber("UI distance (m)", _config.UiDistance, 0.1f, 0.5f, 5f, "0.0");
+        _modMenu.AddToggle("Level horizon (comfort)", _config.LevelHorizon);
+        _modMenu.AddToggle("Remove head bob and shake", _config.StabilizeView);
+        _modMenu.AddToggle("Stereo weapon", _config.StereoWeapon);
+        _modMenu.AddToggle("Positional tracking (6DoF)", _config.PositionalTracking);
+        _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
+        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
+            value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
+        _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
+        _modMenu.AddAction("Recenter view", () => _recenterPending = true);
+        _modMenu.AddAction("Close", () => _modMenu.Close());
+    }
+
+    /// <summary>Hold the right thumbstick click for a second to open or close the mod menu.</summary>
+    private bool ProcessMenuChord(bool rightStickClick)
+    {
+        if (!rightStickClick)
+        {
+            var wasTap = _menuChordStart >= 0f && !_menuChordFired;
+            _menuChordStart = -1f;
+            _menuChordFired = false;
+            return wasTap;
+        }
+
+        if (_menuChordStart < 0f)
+            _menuChordStart = Time.unscaledTime;
+        else if (!_menuChordFired && Time.unscaledTime - _menuChordStart >= MenuChordSeconds)
+        {
+            _menuChordFired = true;
+            _modMenu.Toggle();
+        }
+        return false;
+    }
+
     public override void OnSceneWasInitialized(int buildIndex, string sceneName)
     {
         if (_vrRequested)
@@ -137,10 +182,22 @@ public sealed class JumpSpaceVrMod : MelonMod
             _mockInput.Apply();
 
         var state = _runtime.Controllers.Read();
+        _lastControllerState = state;
         if (!state.IsActive && _config.SyntheticControllers.Value)
             state = new ControllerState { IsActive = true, LeftStick = new Vector2(0.5f, 0f), RightTrigger = 1f, ButtonA = true };
 
         state.Menu = ProcessMenuButton(state.Menu);
+
+        // Right stick click: a tap still reaches the game (briefly, on release); holding it opens the mod menu.
+        var rightClickTap = ProcessMenuChord(state.RightStickClick && !state.LeftStickClick);
+        state.RightStickClick = rightClickTap || (state.RightStickClick && state.LeftStickClick);
+
+        if (_modMenu.IsOpen)
+        {
+            // The menu owns the controllers while it is open; the game sees a released gamepad.
+            _gamepad.Send(new ControllerState { IsActive = state.IsActive });
+            return;
+        }
 
         var recenterChord = state.LeftStickClick && state.RightStickClick;
         if (recenterChord && !_recenterChordHeld)
@@ -156,6 +213,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     }
 
     private bool _recenterChordHeld;
+    private ControllerState _lastControllerState;
     private float _menuPressedAt = -1f;
     private bool _menuHoldTriggered;
     private float _menuTapReleaseUntil;
@@ -225,6 +283,10 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         HandleUiAdjustKeys();
 
+        if (_hotkeys.WasPressed(_config.ModMenuKey.Value))
+            _modMenu.Toggle();
+        _modMenu.Update(_hotkeys, _lastControllerState);
+
         if (_hotkeys.WasPressed(_config.SnapshotKey.Value))
             SaveSnapshots();
 
@@ -283,6 +345,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void DisableVr()
     {
+        FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
         _uiCompositor.Stop();
         _stereoRenderer.Deactivate();
@@ -300,6 +363,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         _beforeRenderHooked = BeforeRenderHook.Install(HarmonyInstance, OnBeforeRender)
                               && StereoRenderer.InstallHooks(HarmonyInstance);
+        FirstPersonRenderFix.InstallHooks(HarmonyInstance);
     }
 
 
@@ -322,6 +386,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             }
 
             _headTracker.Update();
+            FirstPersonRenderFix.Apply(_config.StereoWeapon.Value);
             if (!_stereoRenderer.PrepareFrame() || !OpenXRHooks.HasViews)
                 return;
 
@@ -330,14 +395,15 @@ public sealed class JumpSpaceVrMod : MelonMod
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
-                    _config.LevelHorizon.Value))
+                    _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;
                 _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.ViewRotation, headPosition, left.Rotation,
-                    _config.UiDistance.Value, _config.UiWidth.Value, _snapPanelToHead);
+                    _config.UiFollow.Value, _config.UiSmoothing.Value, _config.UiDistance.Value, _config.UiWidth.Value,
+                    _snapPanelToHead);
                 _snapPanelToHead = false;
             }
         }
