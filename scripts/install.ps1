@@ -80,10 +80,27 @@ function Install-DotNet6 {
     }
 }
 
+function Test-ZipFile([string]$Path) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    try {
+        [System.IO.Compression.ZipFile]::OpenRead($Path).Dispose()
+        return $true
+    } catch {
+        return $false
+    }
+}
+
 function Get-VerifiedDownload([string]$Url, [string]$Destination, [string]$ExpectedSha1) {
+    # A cached download is reused only if it is complete; an interrupted one is fetched again.
+    if ((Test-Path $Destination) -and $Destination.EndsWith('.zip') -and -not (Test-ZipFile $Destination)) {
+        Write-Host "Cached download $Destination is incomplete; downloading it again."
+        Remove-Item $Destination -Force
+    }
     if (-not (Test-Path $Destination)) {
         Write-Host "Downloading $Url"
-        Invoke-WebRequest -Uri $Url -OutFile $Destination -UseBasicParsing
+        $partial = "$Destination.part"
+        Invoke-WebRequest -Uri $Url -OutFile $partial -UseBasicParsing
+        Move-Item $partial $Destination -Force
     }
     if ($ExpectedSha1) {
         $actual = (Get-FileHash -Path $Destination -Algorithm SHA1).Hash.ToLowerInvariant()
@@ -114,9 +131,12 @@ function Install-OpenXRRuntime([string]$Game) {
     Get-VerifiedDownload $dist.tarball $archive $dist.shasum
 
     $extractDir = Join-Path $VendorDir "com.unity.xr.openxr-$OpenXRPackageVersion"
-    if (-not (Test-Path $extractDir)) {
+    if (-not (Test-Path (Join-Path $extractDir 'package\package.json'))) {
+        # Start clean so an earlier failed extraction is never mistaken for a finished one. Use Windows' own tar:
+        # another tar on PATH (for example Git's GNU tar) reads "C:\..." as a remote host.
+        if (Test-Path $extractDir) { Remove-Item $extractDir -Recurse -Force }
         New-Item -ItemType Directory -Path $extractDir | Out-Null
-        tar -xzf $archive -C $extractDir
+        & (Join-Path $env:SystemRoot 'System32\tar.exe') -xzf $archive -C $extractDir
         if ($LASTEXITCODE -ne 0) { throw 'Failed to extract the OpenXR package.' }
     }
 
