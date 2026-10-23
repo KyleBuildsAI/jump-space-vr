@@ -53,6 +53,17 @@ internal sealed class MotionControls
     /// <summary>True while motion aiming drives the game this frame.</summary>
     public bool IsActive { get; private set; }
 
+    /// <summary>True when the first-person rig was moved onto the controller for the last rendered frame.</summary>
+    public bool WeaponInHand => Time.frameCount - _weaponPlacedFrame <= 1;
+
+    private int _weaponPlacedFrame = -10;
+
+    /// <summary>Whether the rig's item locator was found (otherwise only the configured offset places it).</summary>
+    public bool HasItemLocator { get; private set; }
+
+    /// <summary>Distance between the rig's item locator and the controller grip after placement, in meters.</summary>
+    public float LastGripError { get; private set; }
+
     public static bool InstallHooks(HarmonyLib.Harmony harmony)
     {
         try
@@ -167,6 +178,9 @@ internal sealed class MotionControls
         if (locator != null)
             gripInRig += weapon.InverseTransformPoint(locator.position);
         weapon.SetPositionAndRotation(handPosition - aimRotation * gripInRig, aimRotation);
+        HasItemLocator = locator != null;
+        _weaponPlacedFrame = Time.frameCount;
+        LastGripError = locator != null ? Vector3.Distance(locator.position, handPosition + aimRotation * gripOffsetInRig) : 0f;
         _weaponAppliedLocalPosition = weapon.localPosition;
         _weaponAppliedLocalRotation = weapon.localRotation;
         _weaponMoved = true;

@@ -20,6 +20,12 @@ wait 5
 recenter
 wait 2
 
+# The first-person rig sits on the controller: its item locator lands on the grip.
+expect weaponInHand == 1
+expect itemLocator == 1
+expect gripErrorCm < 1
+snapshot
+
 # Aim 30 degrees right and 15 degrees up: the game camera must follow.
 hand right 0.2 1.4 0.3  -15 30 0
 wait 2
