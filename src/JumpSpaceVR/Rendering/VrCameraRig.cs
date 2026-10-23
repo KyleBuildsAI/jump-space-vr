@@ -75,12 +75,13 @@ internal sealed class VrCameraRig
             _cullingMaskChanged = false;
         }
 
-        // Only undo our offset if nothing else moved the camera since we applied it.
-        if (_cameraTransform.localPosition == _appliedLocalPosition && _cameraTransform.localRotation == _appliedLocalRotation)
-        {
+        // Only undo what nothing else changed since we applied it. Position and rotation are separate: the game
+        // moves the camera locally every frame (spring arm length, bob) but leaves its rotation to the parents,
+        // and a leftover headset rotation would make aiming and the motion-aim loop follow the head.
+        if (_cameraTransform.localPosition == _appliedLocalPosition)
             _cameraTransform.localPosition = _baseLocalPosition;
+        if (_cameraTransform.localRotation == _appliedLocalRotation)
             _cameraTransform.localRotation = _baseLocalRotation;
-        }
     }
 
     /// <summary>
