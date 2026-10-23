@@ -19,12 +19,12 @@ internal sealed unsafe class VirtualMouse
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     private struct MouseStateEvent
     {
-        // InputEvent header
+        // InputEvent header (NativeInputEvent: type, size, device, time, id; packed to 20 bytes)
         public int Type;
         public ushort SizeInBytes;
         public ushort DeviceId;
-        public int EventId;
         public double Time;
+        public int EventId;
         // StateEvent
         public int StateFormat;
         // MouseState
@@ -40,6 +40,12 @@ internal sealed unsafe class VirtualMouse
     private bool _creationFailed;
     private Vector2 _lastPosition;
 
+    /// <summary>Left button state the Input System holds for the virtual mouse.</summary>
+    public bool DeviceLeftPressed => _device != null && _device.TryCast<Mouse>()?.leftButton.isPressed == true;
+
+    /// <summary>Pointer position the Input System holds for the virtual mouse.</summary>
+    public Vector2 DevicePosition => _device?.TryCast<Mouse>()?.position.ReadValue() ?? Vector2.zero;
+
     /// <summary>Moves the pointer to a screen position (pixels, origin bottom-left) with the left button state.</summary>
     public void Send(Vector2 screenPosition, bool leftButton)
     {
@@ -53,7 +59,7 @@ internal sealed unsafe class VirtualMouse
             Type = StateEventType,
             SizeInBytes = (ushort)sizeof(MouseStateEvent),
             DeviceId = (ushort)_device.deviceId,
-            Time = InputState.currentTime,
+            Time = InputEventTime.Now,
             StateFormat = MouseFormat,
             PositionX = screenPosition.x,
             PositionY = screenPosition.y,
@@ -79,6 +85,18 @@ internal sealed unsafe class VirtualMouse
         _device = null;
     }
 
+    private string DescribeLayout()
+    {
+        var text = $"state {_device.stateBlock.format} {_device.stateBlock.sizeInBits} bits;";
+        foreach (var name in new[] { "position", "delta", "scroll", "press", "leftButton", "rightButton", "clickCount", "displayIndex" })
+        {
+            var control = _device.TryGetChildControl(name);
+            if (control != null)
+                text += $" {name}@{control.stateBlock.byteOffset}.{control.stateBlock.bitOffset}";
+        }
+        return text;
+    }
+
     private bool EnsureDevice()
     {
         if (_device != null && _device.added)
@@ -88,7 +106,7 @@ internal sealed unsafe class VirtualMouse
         try
         {
             _device = InputSystem.AddDevice("Mouse", DeviceName, null);
-            Log.Msg($"Virtual pointer mouse added (device id {_device.deviceId}).");
+            Log.Msg($"Virtual pointer mouse added (device id {_device.deviceId}). {DescribeLayout()}");
             return true;
         }
         catch (Exception exception)

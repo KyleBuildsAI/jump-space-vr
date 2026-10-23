@@ -3,6 +3,7 @@
     Installs the Jump Space VR mod.
 
 .DESCRIPTION
+    0. Makes sure the .NET 6 runtime MelonLoader needs is installed (via winget when missing).
     1. Installs MelonLoader (if missing) into the game folder.
     2. Downloads the Unity OpenXR plugin package from Unity's package registry and copies its native
        runtime (UnityOpenXR.dll + openxr_loader.dll) and subsystem manifest into the game's data folder.
@@ -33,7 +34,7 @@ $VendorDir = Join-Path $RepoRoot 'vendor'
 
 function Find-GamePath {
     $steamPath = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
-    if (-not $steamPath) { throw 'Steam not found. Pass -GamePath explicitly.' }
+    if (-not $steamPath) { return $null }
 
     $libraryFile = Join-Path $steamPath 'steamapps\libraryfolders.vdf'
     $libraries = @($steamPath) + (Select-String -Path $libraryFile -Pattern '"path"\s+"(.+)"' |
@@ -46,7 +47,37 @@ function Find-GamePath {
             return Join-Path $library "steamapps\common\$installDir"
         }
     }
-    throw 'Jump Space not found in any Steam library. Pass -GamePath explicitly.'
+    return $null
+}
+
+function Request-GamePath {
+    Write-Host 'Could not find Jump Space automatically.'
+    $answer = Read-Host 'Paste the Jump Space install folder (Steam > Jump Space > Manage > Browse local files)'
+    return $answer.Trim('"', ' ')
+}
+
+function Test-DotNet6 {
+    try {
+        $runtimes = & dotnet --list-runtimes 2>$null
+        return [bool]($runtimes | Select-String 'Microsoft\.NETCore\.App 6\.')
+    } catch {
+        return $false
+    }
+}
+
+function Install-DotNet6 {
+    if (Test-DotNet6) {
+        Write-Host '.NET 6 runtime found.'
+        return
+    }
+    Write-Host 'MelonLoader needs the .NET 6 runtime; installing it...'
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install --id Microsoft.DotNet.Runtime.6 --exact --silent --accept-package-agreements --accept-source-agreements
+    }
+    if (-not (Test-DotNet6)) {
+        Write-Warning 'Could not install .NET 6 automatically. Install ".NET Runtime 6" (x64) from https://dotnet.microsoft.com/download/dotnet/6.0 and run this installer again.'
+        throw '.NET 6 runtime missing.'
+    }
 }
 
 function Get-VerifiedDownload([string]$Url, [string]$Destination, [string]$ExpectedSha1) {
@@ -71,7 +102,7 @@ function Install-MelonLoader([string]$Game) {
     $zip = Join-Path $VendorDir "MelonLoader-$MelonLoaderVersion.x64.zip"
     Get-VerifiedDownload "https://github.com/LavaGang/MelonLoader/releases/download/v$MelonLoaderVersion/MelonLoader.x64.zip" $zip $null
     Expand-Archive -Path $zip -DestinationPath $Game -Force
-    Write-Host "MelonLoader $MelonLoaderVersion installed. Launch the game once so it can generate its assemblies before building."
+    Write-Host "MelonLoader $MelonLoaderVersion installed."
 }
 
 function Install-OpenXRRuntime([string]$Game) {
@@ -116,12 +147,14 @@ function Install-Mod([string]$Game) {
 }
 
 if (-not $GamePath) { $GamePath = Find-GamePath }
+if (-not $GamePath) { $GamePath = Request-GamePath }
 if (-not (Test-Path (Join-Path $GamePath 'GameAssembly.dll'))) { throw "$GamePath does not look like a Jump Space install." }
 if (Get-Process -Name 'Jump Space' -ErrorAction SilentlyContinue) { throw 'Close Jump Space before installing.' }
 
 New-Item -ItemType Directory -Force -Path $VendorDir | Out-Null
 Write-Host "Game: $GamePath"
 
+Install-DotNet6
 Install-MelonLoader $GamePath
 Install-OpenXRRuntime $GamePath
 $hasPrebuilt = Test-Path (Join-Path $RepoRoot 'JumpSpaceVR.dll')
@@ -130,3 +163,8 @@ if ($hasPrebuilt -or (Test-Path (Join-Path $GamePath 'MelonLoader\Il2CppAssembli
 } else {
     Write-Warning 'MelonLoader has not generated game assemblies yet. Start the game once, close it, then run this script again.'
 }
+
+Write-Host ''
+Write-Host 'Done! Start your VR app (SteamVR / Steam Link, Virtual Desktop or Quest Link), then launch Jump Space from Steam.'
+Write-Host 'The first launch after installing takes a few extra minutes while MelonLoader prepares the game.'
+Write-Host 'In game: Insert = VR settings menu, F7 = recenter, F8 = VR on/off.'

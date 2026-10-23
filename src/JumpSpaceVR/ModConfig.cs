@@ -41,10 +41,12 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<VrUi.UiFollowMode> UiFollow { get; }
     public MelonPreferences_Entry<float> UiSmoothing { get; }
     public MelonPreferences_Entry<string> OpenXRRuntimeJson { get; }
+    public MelonPreferences_Entry<OpenXR.RuntimePreference> Runtime { get; }
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
     public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
     public MelonPreferences_Entry<bool> SyntheticControllers { get; }
     public MelonPreferences_Entry<bool> DebugAimOffset { get; }
+    public MelonPreferences_Entry<string> ScenarioFile { get; }
     public MelonPreferences_Entry<float> DebugAimPitch { get; }
     public MelonPreferences_Entry<float> DebugAimYaw { get; }
     public MelonPreferences_Entry<bool> MockControllerInput { get; }
@@ -107,8 +109,11 @@ internal sealed class ModConfig
             "Fixed: stays in front of your body. Lazy: eases back in front when you look away. Smooth: follows your face.");
         UiSmoothing = _category.CreateEntry("UiSmoothing", 0.12f, "UI smoothing (s)",
             "How softly the panel follows in Smooth mode. 0 = rigidly locked to your view.");
+        Runtime = _category.CreateEntry("Runtime", OpenXR.RuntimePreference.Auto, "VR runtime",
+            "Auto picks the VR app you are running (SteamVR/Steam Link, Virtual Desktop), then the Windows default. " +
+            "Options: Auto, SystemDefault, SteamVR, VirtualDesktop, MetaLink.");
         OpenXRRuntimeJson = _category.CreateEntry("OpenXRRuntimeJson", "", "OpenXR runtime override",
-            "Optional path to an OpenXR runtime manifest (.json). Leave empty to use the system's active runtime.");
+            "Advanced: path to a specific OpenXR runtime manifest (.json). Overrides the VR runtime setting.");
         ControllersAsGamepad = _category.CreateEntry("ControllersAsGamepad", true, "VR controllers as gamepad",
             "Play with VR controllers: sticks, triggers, grips (bumpers) and face buttons act like an Xbox controller. " +
             "Click both thumbsticks to recenter.");
@@ -120,6 +125,8 @@ internal sealed class ModConfig
             "Developer option: turn the controller pointer 30 degrees right and 15 degrees up to test motion aiming.");
         DebugAimPitch = _category.CreateEntry("DebugAimPitch", -15f, "Debug aim pitch", "Developer option (negative = up).");
         DebugAimYaw = _category.CreateEntry("DebugAimYaw", 30f, "Debug aim yaw", "Developer option (positive = right).");
+        ScenarioFile = _category.CreateEntry("ScenarioFile", "", "Test scenario",
+            "Developer option: path of a scenario script to run against the OpenXR mock runtime (see scenarios/).");
         SnapshotOnStartup = _category.CreateEntry("SnapshotOnStartup", false, "Snapshot on startup",
             "Developer option: save eye snapshots once, shortly after VR starts.");
     }

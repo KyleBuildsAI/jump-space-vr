@@ -9,8 +9,9 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.2.2", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.3.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
+[assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
 namespace JumpSpaceVR;
 
@@ -38,11 +39,14 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly RoomscaleLocomotion _roomscale = new();
     private readonly VirtualMouse _mouse = new();
     private Vector2? _pointerScreen;
+    private bool _pointerOwnsCursor;
+    private CursorLockMode? _gameCursorLock;
     private bool _resetBodyYaw = true;
     private float _menuChordStart = -1f;
     private bool _menuChordFired;
     private const float MenuChordSeconds = 1f;
     private readonly ConformanceInputDriver _mockInput = new();
+    private Testing.ScenarioRunner _scenario;
     private readonly HotkeyReader _hotkeys = new();
 
     private bool _vrRequested;
@@ -56,8 +60,6 @@ public sealed class JumpSpaceVrMod : MelonMod
         _config = new ModConfig();
         _vrRequested = _config.StartInVr.Value;
 
-        ApplyRuntimeOverride();
-
         var pluginsDirectory = Path.Combine(Application.dataPath, "Plugins", "x86_64");
         OpenXRNative.InstallResolver(pluginsDirectory);
 
@@ -65,6 +67,12 @@ public sealed class JumpSpaceVrMod : MelonMod
             Log.Error($"UnityOpenXR.dll is missing from {pluginsDirectory}. Run scripts/install.ps1 again.");
 
         BuildModMenu();
+        if (!string.IsNullOrWhiteSpace(_config.ScenarioFile.Value))
+        {
+            _scenario = new Testing.ScenarioRunner(_mockInput, ScenarioMetric, ScenarioCommand);
+            if (!_scenario.Load(_config.ScenarioFile.Value))
+                _scenario = null;
+        }
         if (_config.DebugAimOffset.Value)
         {
             MotionControls.DebugPointerRotation = Quaternion.Euler(_config.DebugAimPitch.Value, _config.DebugAimYaw.Value, 0f);
@@ -82,28 +90,15 @@ public sealed class JumpSpaceVrMod : MelonMod
         Log.Msg($"Loaded. Toggle VR: {_config.ToggleVrKey.Value}, recenter: {_config.RecenterKey.Value}, diagnostics: {_config.DiagnosticsKey.Value}.");
     }
 
-    private void ApplyRuntimeOverride()
-    {
-        var runtimeJson = _config.OpenXRRuntimeJson.Value;
-        if (string.IsNullOrWhiteSpace(runtimeJson))
-            return;
-
-        if (!File.Exists(runtimeJson))
-        {
-            Log.Warning($"OpenXR runtime override not found: {runtimeJson}. Using the system runtime.");
-            return;
-        }
-
-        Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", runtimeJson);
-        Log.Msg($"Using OpenXR runtime override: {runtimeJson}");
-    }
-
     public override void OnUpdate()
     {
         _frameCount++;
         Diagnostics.RecordFrame();
         _cameraRig.RestoreGamePose();
         _motion.RestoreWeapon();
+        // After the restore, so scenario checks see the game's own camera rather than the headset view.
+        if (_scenario != null && _runtime != null && _runtime.IsRendering)
+            _scenario.Update();
         HandleHotkeys();
         UpdateControllers();
 
@@ -154,6 +149,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("Weapon offset X (right)", _config.WeaponOffsetX, 0.01f, -0.5f, 0.5f, "0.00");
         _modMenu.AddNumber("Weapon offset Y (up)", _config.WeaponOffsetY, 0.01f, -0.6f, 0.4f, "0.00");
         _modMenu.AddNumber("Weapon offset Z (forward)", _config.WeaponOffsetZ, 0.01f, -0.3f, 0.8f, "0.00");
+        _modMenu.AddChoice("VR runtime (F8 twice to apply)", _config.Runtime);
         _modMenu.AddAction("Recenter view", () => _recenterPending = true);
         _modMenu.AddAction("Close", () => _modMenu.Close());
     }
@@ -204,7 +200,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (!_vrRequested || _runtime == null || !_runtime.IsRendering || !_config.ControllersAsGamepad.Value)
             return;
 
-        if (_config.MockControllerInput.Value)
+        if (_config.MockControllerInput.Value || _scenario != null)
             _mockInput.Apply();
 
         var state = _runtime.Controllers.Read();
@@ -221,6 +217,13 @@ public sealed class JumpSpaceVrMod : MelonMod
         // Laser pointer: while it touches the UI panel in a menu, the right trigger clicks instead of firing.
         if (_pointerScreen.HasValue)
         {
+            // The game locks the cursor whenever the gamepad was used last, and the UI input module ignores a
+            // locked pointer. Outside a level the laser owns the pointer, so keep it unlocked there.
+            if (_pointerOwnsCursor && Cursor.lockState != CursorLockMode.None)
+            {
+                _gameCursorLock = Cursor.lockState;
+                Cursor.lockState = CursorLockMode.None;
+            }
             _mouse.Send(_pointerScreen.Value, state.RightTrigger > 0.5f);
             state.RightTrigger = 0f;
         }
@@ -254,6 +257,75 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private bool _recenterChordHeld;
 
+    /// <summary>Values a test scenario can wait for and check.</summary>
+    private float? ScenarioMetric(string name)
+    {
+        var camera = Camera.main;
+        float? cameraYaw = camera != null ? camera.transform.eulerAngles.y : null;
+        float? cameraPitch = camera != null ? -Mathf.DeltaAngle(0f, camera.transform.eulerAngles.x) : null;
+        return name switch
+        {
+            "vrRendering" => _runtime != null && _runtime.IsRendering ? 1f : 0f,
+            "inLevel" => IsInLevel() ? 1f : 0f,
+            "cameraYaw" => cameraYaw,
+            "cameraPitch" => cameraPitch,
+            "bodyYaw" => _motion.Body.Yaw,
+            "aimYawOffset" => cameraYaw.HasValue ? Mathf.DeltaAngle(_motion.Body.Yaw, cameraYaw.Value) : null,
+            "motionActive" => _motion.IsActive ? 1f : 0f,
+            "stereoWeapon" => FirstPersonRenderFix.Enabled ? 1f : 0f,
+            "modMenuOpen" => _modMenu.IsOpen ? 1f : 0f,
+            "cursorFree" => Cursor.lockState != CursorLockMode.Locked ? 1f : 0f,
+            "cutscene" => IsCutscenePlaying() ? 1f : 0f,
+            "mainMenu" => GameObject.Find("PF_MainMenu/Canvas") != null ? 1f : 0f,
+            "laserOnPanel" => _uiCompositor.CursorUv.HasValue ? 1f : 0f,
+            "virtualMouseX" => _mouse.DevicePosition.x,
+            "virtualMouseLeft" => _mouse.DeviceLeftPressed ? 1f : 0f,
+            "pointerActive" => _pointerScreen.HasValue ? 1f : 0f,
+            "laserU" => _uiCompositor.CursorUv?.x,
+            "laserV" => _uiCompositor.CursorUv?.y,
+            "gamepadLeftX" => _lastControllerState.LeftStick.x,
+            "gamepadLeftY" => _lastControllerState.LeftStick.y,
+            "rightTrigger" => _lastControllerState.RightTrigger,
+            "rightHandValid" => _lastControllerState.RightHand.IsValid ? 1f : 0f,
+            "rightHandX" => _lastControllerState.RightHand.Position.x,
+            "rightHandY" => _lastControllerState.RightHand.Position.y,
+            "rightHandZ" => _lastControllerState.RightHand.Position.z,
+            _ => null,
+        };
+    }
+
+    private static bool IsCutscenePlaying()
+    {
+        foreach (var canvas in UnityEngine.Object.FindObjectsByType<Canvas>(FindObjectsSortMode.None))
+        {
+            if (!canvas.isActiveAndEnabled)
+                continue;
+            for (var parent = canvas.transform; parent != null; parent = parent.parent)
+            {
+                if (parent.name.StartsWith("PF_Cutscene", StringComparison.Ordinal))
+                    return true;
+            }
+        }
+        return false;
+    }
+
+    private void ScenarioCommand(string command)
+    {
+        switch (command)
+        {
+            case "snapshot":
+                SaveSnapshots();
+                break;
+            case "diagnostics":
+                if (_runtime != null)
+                    Diagnostics.Dump(_runtime);
+                break;
+            case "recenter":
+                _recenterPending = true;
+                break;
+        }
+    }
+
     /// <summary>
     /// Points the right controller at the UI panel while the game shows a free mouse cursor (menus, inventory,
     /// pause). The hit drives a virtual mouse; gameplay (locked cursor) is unaffected.
@@ -262,7 +334,24 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         _pointerScreen = null;
         _uiCompositor.CursorUv = null;
-        if (!_config.LaserPointer.Value || !pointer.IsValid || Cursor.lockState == CursorLockMode.Locked)
+        var inLevel = IsInLevel();
+        var ownedCursor = _pointerOwnsCursor;
+        _pointerOwnsCursor = false;
+        AimLaserPointer(pointer, inLevel);
+
+        // Hand the cursor back the way the game had it once the laser no longer owns it (left the panel or entered
+        // a level); the game doesn't re-lock it by itself.
+        if (ownedCursor && !_pointerOwnsCursor && _gameCursorLock.HasValue)
+        {
+            if (Cursor.lockState == CursorLockMode.None)
+                Cursor.lockState = _gameCursorLock.Value;
+            _gameCursorLock = null;
+        }
+    }
+
+    private void AimLaserPointer(in TrackedPose pointer, bool inLevel)
+    {
+        if (!_config.LaserPointer.Value || !pointer.IsValid || (inLevel && Cursor.lockState == CursorLockMode.Locked))
             return;
 
         var origin = _cameraRig.GamePosition + _cameraRig.ViewRotation * (pointer.Position * _config.WorldScale.Value);
@@ -272,7 +361,29 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         _uiCompositor.CursorUv = uv;
         _pointerScreen = new Vector2(uv.x * Screen.width, uv.y * Screen.height);
+        _pointerOwnsCursor = !inLevel;
     }
+
+    /// <summary>
+    /// True while a player character exists. In a level the laser only works when the game itself frees the cursor
+    /// (pause menu, terminals); outside one it always works, even with the cursor locked, because the game locks it
+    /// whenever the (virtual) gamepad is the active device. The camera lives under the camera manager, not the
+    /// character, so this looks for the character's camera controller (refreshed twice a second).
+    /// </summary>
+    private bool IsInLevel()
+    {
+        if (Time.frameCount >= _inLevelCheckFrame)
+        {
+            _inLevelCheckFrame = Time.frameCount + InLevelCheckIntervalFrames;
+            _inLevel = UnityEngine.Object.FindObjectsByType<Il2Cpp.CameraController_Character>(FindObjectsSortMode.None).Length > 0;
+        }
+        return _inLevel;
+    }
+
+    private const int InLevelCheckIntervalFrames = 45;
+    private int _inLevelCheckFrame;
+    private bool _inLevel;
+
     private ControllerState _lastControllerState;
     private float _menuPressedAt = -1f;
     private bool _menuHoldTriggered;
@@ -363,9 +474,9 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         try
         {
-            _runtime ??= new OpenXRRuntime { RequestConformanceAutomation = _config.MockControllerInput.Value };
+            _runtime ??= new OpenXRRuntime { RequestConformanceAutomation = _config.MockControllerInput.Value || _scenario != null };
             var renderMode = _config.SinglePassInstanced.Value ? StereoRenderMode.SinglePassInstanced : StereoRenderMode.MultiPass;
-            if (!_runtime.IsInitialized && !_runtime.Initialize(renderMode))
+            if (!_runtime.IsInitialized && !InitializeFirstWorkingRuntime(renderMode))
             {
                 // Usually the headset is not connected yet; keep trying so it can be connected after launch.
                 _nextRetryTime = Time.realtimeSinceStartup + RetryIntervalSeconds;
@@ -401,6 +512,27 @@ public sealed class JumpSpaceVrMod : MelonMod
             _vrRequested = false;
             Log.Error($"Failed to start VR: {exception}");
         }
+    }
+
+    /// <summary>
+    /// Tries each candidate runtime (the VR app that is running first, then the Windows default) until one has a
+    /// headset ready. Works for Steam Link and SteamVR, Virtual Desktop (VDXR or SteamVR mode) and Quest Link.
+    /// </summary>
+    private bool InitializeFirstWorkingRuntime(StereoRenderMode renderMode)
+    {
+        var candidates = RuntimeSelector.Candidates(_config.Runtime.Value, _config.OpenXRRuntimeJson.Value);
+        foreach (var candidate in candidates)
+        {
+            Environment.SetEnvironmentVariable("XR_RUNTIME_JSON", candidate.ManifestPath);
+            if (_runtime.Initialize(renderMode))
+            {
+                Log.Msg($"Connected to OpenXR runtime: {candidate.Name}.");
+                return true;
+            }
+            if (!_runtime.QuietFailures)
+                Log.Msg($"No headset on {candidate.Name}.");
+        }
+        return false;
     }
 
     private void DisableVr()

@@ -77,6 +77,20 @@ internal static partial class Diagnostics
             return "not created";
         });
 
+        Section(report, "Pointer", () =>
+        {
+            var mouse = UnityEngine.InputSystem.Mouse.current;
+            var eventSystem = UnityEngine.EventSystems.EventSystem.current;
+            var module = eventSystem != null ? eventSystem.currentInputModule : null;
+            var hovered = eventSystem != null && eventSystem.IsPointerOverGameObject();
+            return $"cursor={Cursor.lockState}/{(Cursor.visible ? "visible" : "hidden")}, mouse={mouse?.name}@{mouse?.position.ReadValue()} " +
+                   $"left={mouse?.leftButton.isPressed}, eventSystem={eventSystem?.name}, module={module?.GetIl2CppType().Name}, overUi={hovered}, " +
+                   $"focused={Application.isFocused}, background={UnityEngine.InputSystem.InputSystem.settings.backgroundBehavior}, " +
+                   $"updates={UnityEngine.InputSystem.InputSystem.settings.updateMode}, selected={eventSystem?.currentSelectedGameObject?.name}, " +
+                   $"inputTime={UnityEngine.InputSystem.LowLevel.InputState.currentTime:F3} offset={UnityEngine.InputSystem.LowLevel.InputRuntime.s_CurrentTimeOffsetToRealtimeSinceStartup:F3} " +
+                   $"realtime={Time.realtimeSinceStartupAsDouble:F3} mouseUpdatedInternal={mouse?.m_LastUpdateTimeInternal:F3}";
+        });
+
         report.AppendLine("-- Cameras --");
         Section(report, "Main camera", () => Camera.main != null ? PathOf(Camera.main.transform) : "none");
         foreach (var camera in Camera.allCameras)
