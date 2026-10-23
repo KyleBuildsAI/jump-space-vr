@@ -310,12 +310,11 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private static bool IsLetterboxVisible()
     {
-        var root = GameObject.Find("PF_FadeToBlackController(Clone)/PF_FadeToBlack");
-        if (root == null)
-            return false;
-        foreach (var graphic in root.GetComponentsInChildren<UnityEngine.UI.Graphic>())
+        foreach (var graphic in UnityEngine.Object.FindObjectsByType<UnityEngine.UI.Graphic>(FindObjectsSortMode.None))
         {
-            if (graphic.isActiveAndEnabled && graphic.rectTransform.rect.height > 1f && graphic.color.a > 0.5f)
+            var name = graphic.gameObject.name;
+            if ((name.StartsWith("LetterBox", StringComparison.Ordinal) || name is "TopPannel" or "BottomPannel") &&
+                graphic.isActiveAndEnabled && graphic.rectTransform.rect.height > 1f && graphic.color.a > 0.5f)
                 return true;
         }
         return false;
