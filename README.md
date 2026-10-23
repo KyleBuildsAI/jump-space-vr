@@ -16,12 +16,24 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
   head looks around freely on top of it. Ship, turret and cutscene cameras keep working.
 - **Menus and HUD in VR.** All screen-space UI is drawn on a floating panel. Mouse, keyboard and gamepad navigation
   work unchanged.
-- **VR controllers.** The controllers appear to the game as an Xbox-style gamepad, so every gamepad action works:
-  - Sticks map to the sticks, and stick clicks to L3/R3.
+- **Motion controls.** Aim with your right controller: the game's own look system is steered to wherever the
+  controller points, so firing and co-op aim replication work natively. The right stick snap-turns (45°) or
+  smooth-turns your body; the left stick moves relative to your body. The first-person weapon is placed in your
+  right hand at the game's item attach point.
+- **VR controllers as a gamepad.** Everything else maps to an Xbox-style gamepad, so every gamepad action works:
+  - Left stick moves, and stick clicks map to L3/R3.
   - Triggers map to the triggers.
   - Grips map to LB/RB.
   - A/B/X/Y map to A/B/X/Y.
   - The left menu button maps to Start.
+- **Mod menu (Insert).** An in-headset settings menu. It covers UI follow mode and size, comfort options, turning,
+  motion controls and weapon offsets.
+- **Comfort.**
+  - Head bob, recoil kick and knockback shake are removed from your view.
+  - The game never pitches or rolls the horizon.
+  - Your view recenters on every level load and camera change.
+- **Stereo weapon.** The game draws the first-person weapon with a flat overlay pass; the mod renders it with the
+  eye cameras instead, so it isn't seen double.
 - **Desktop mirror.** The monitor shows the left eye with the UI on top.
 - **Headset hot-plug.** Start the game first and connect the headset whenever you like; the mod keeps retrying.
 
@@ -63,6 +75,7 @@ update if VR stops working.
 | Input | Action |
 | --- | --- |
 | `F8` | Toggle VR on/off |
+| `Insert`, or hold the right thumbstick click for 1 s | Open/close the mod menu (arrows / left stick to navigate, Enter / A to change, B to close) |
 | `F7`, hold the left menu button for 1 s, or click both thumbsticks | Recenter: line up your view with where the player is looking. Also happens automatically on level loads and camera changes. |
 | `F9` | Write diagnostics to `MelonLoader/Latest.log` |
 | `F10` | Save what the headset sees to `UserData/JumpSpaceVR/*.bmp` |
@@ -70,6 +83,17 @@ update if VR stops working.
 | `F3` / `F4` | UI panel closer / further (saved immediately) |
 
 Mouse, keyboard and gamepads keep working while you play in VR.
+
+Controller layout with motion controls on (default):
+
+| Controller | Action |
+| --- | --- |
+| Right controller | Aim (point where you want to shoot) |
+| Right trigger / left trigger | Fire / aim down sights (game's RT / LT) |
+| Left stick | Move (relative to your body) |
+| Right stick left/right | Snap or smooth turn |
+| Grips | Bumpers (LB / RB) |
+| A / B / X / Y | Face buttons |
 
 ## Settings
 

@@ -21,7 +21,11 @@ internal static class EyeSnapshot
         Write(texture, Path.Combine(directory, $"{label}-{DateTime.Now:yyyyMMdd-HHmmss}.bmp"));
     }
 
-    public static void Save(RenderTexture left, RenderTexture right, string label)
+    /// <summary>
+    /// Saves a pair of eye images. Headset captures are read back from the compositor's swapchain images, which
+    /// are stored top-down, so they are flipped to read upright.
+    /// </summary>
+    public static void Save(RenderTexture left, RenderTexture right, string label, bool flipVertical = false)
     {
         if (left == null || right == null)
         {
@@ -32,12 +36,12 @@ internal static class EyeSnapshot
         var directory = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "JumpSpaceVR");
         Directory.CreateDirectory(directory);
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
-        Write(left, Path.Combine(directory, $"{label}-left-{stamp}.bmp"));
-        Write(right, Path.Combine(directory, $"{label}-right-{stamp}.bmp"));
+        Write(left, Path.Combine(directory, $"{label}-left-{stamp}.bmp"), flipVertical);
+        Write(right, Path.Combine(directory, $"{label}-right-{stamp}.bmp"), flipVertical);
         Log.Msg($"Saved eye snapshots to {directory}");
     }
 
-    private static void Write(RenderTexture source, string path)
+    private static void Write(RenderTexture source, string path, bool flipVertical = false)
     {
         var previous = RenderTexture.active;
         var readable = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
@@ -47,7 +51,7 @@ internal static class EyeSnapshot
             readable.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0, false);
             readable.Apply(false, false);
             var pixels = readable.GetPixels32();
-            WriteBitmap(path, source.width, source.height, pixels);
+            WriteBitmap(path, source.width, source.height, pixels, flipVertical);
             LogAlphaCoverage(Path.GetFileName(path), pixels);
         }
         finally
@@ -70,7 +74,8 @@ internal static class EyeSnapshot
         Log.Msg($"{name}: {100f * transparent / Math.Max(1, samples):F1}% transparent");
     }
 
-    private static void WriteBitmap(string path, int width, int height, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Color32> pixels)
+    private static void WriteBitmap(string path, int width, int height, Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppStructArray<Color32> pixels,
+        bool flipVertical)
     {
         const int headerSize = 54;
         var rowSize = width * 3;
@@ -97,8 +102,9 @@ internal static class EyeSnapshot
         writer.Write(0);
 
         // Texture rows start at the bottom, which is also BMP's native order.
-        for (var row = 0; row < height; row++)
+        for (var outputRow = 0; outputRow < height; outputRow++)
         {
+            var row = flipVertical ? height - 1 - outputRow : outputRow;
             for (var column = 0; column < width; column++)
             {
                 var pixel = pixels[row * width + column];

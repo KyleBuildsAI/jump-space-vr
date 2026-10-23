@@ -269,7 +269,7 @@ internal sealed class ModMenu
             var panelRect = panel.GetComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(900f, 760f);
+            panelRect.sizeDelta = new Vector2(900f, 1010f);
 
             var label = new GameObject("Text");
             label.transform.SetParent(panel.transform, false);
@@ -277,7 +277,7 @@ internal sealed class ModMenu
             var font = TMP_Settings.defaultFontAsset;
             if (font != null)
                 _text.font = font;
-            _text.fontSize = 30f;
+            _text.fontSize = 25f;
             _text.richText = true;
             _text.raycastTarget = false;
             _text.color = Color.white;

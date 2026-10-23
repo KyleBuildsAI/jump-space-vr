@@ -7,7 +7,9 @@
 param(
     [int]$GameplayWaitSeconds = 75,
     [switch]$KeepRunning,
-    [switch]$DebugAim
+    [switch]$DebugAim,
+    # Enter the Hangar (second menu entry) instead of the prologue, then equip the first weapon slot.
+    [switch]$Hangar
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,9 +19,13 @@ $keys = Join-Path $PSScriptRoot 'send-keys.ps1'
 & $keys -Keys 0x0D -Delay 6          # accept the Early Access notice
 Start-Sleep -Seconds 20              # intro cinematic
 & $keys -Keys 0x1B -Delay 10         # skip it; the main menu appears
-& $keys -Keys 0x28, 0x26, 0x0D -Delay 3   # select and start Play Prologue (first menu entry)
+if ($Hangar) {
+    & $keys -Keys 0x28, 0x28, 0x0D -Delay 3   # focus the menu, move to Enter Hangar, confirm
+} else {
+    & $keys -Keys 0x28, 0x26, 0x0D -Delay 3   # select and start Play Prologue (first menu entry)
+}
 Start-Sleep -Seconds $GameplayWaitSeconds
-& $keys -Keys 0x1B -Delay 3          # skip intro cinematic if one is still playing
+if ($Hangar) { & $keys -Keys 0x31 -Delay 3 }   # equip weapon slot 1
 & $keys -Keys 0x78, 0x79 -Delay 4    # F9 diagnostics, F10 snapshots
 
 $log = Join-Path 'G:\SteamLibrary\steamapps\common\JumpSpace' 'MelonLoader\Latest.log'

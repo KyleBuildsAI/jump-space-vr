@@ -187,7 +187,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private void SaveSnapshots()
     {
         EyeSnapshot.SaveSingle(_uiCompositor.UiTexture, "ui");
-        _stereoRenderer.CaptureSubmittedFrame((left, right) => EyeSnapshot.Save(left, right, "headset"));
+        _stereoRenderer.CaptureSubmittedFrame((left, right) => EyeSnapshot.Save(left, right, "headset", flipVertical: true));
     }
 
     /// <summary>Feeds VR controllers to the game as a gamepad. Both stick clicks together recenters.</summary>
