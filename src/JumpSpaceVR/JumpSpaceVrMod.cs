@@ -102,8 +102,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _motion.RestoreWeapon();
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
         // After the restore, so scenario checks see the game's own camera rather than the headset view.
-        if (_scenario != null && _runtime != null && _runtime.IsRendering)
-            _scenario.Update();
+        _scenario?.Update();
         HandleHotkeys();
         UpdateControllers();
 

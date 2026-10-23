@@ -1,0 +1,40 @@
+# Turning VR off and on again with F8 (players do this to switch VR runtimes) restarts the OpenXR session cleanly,
+# three times in a row, and the controllers and laser pointer work again afterwards. Runs on the main menu (~2 min).
+
+waitfor vrRendering == 1 120
+key 0x0D
+wait 8
+keyuntil 0x1B 4 mainMenu == 1 90
+wait 2
+
+key 0x77
+waitfor vrRendering == 0 20
+wait 2
+key 0x77
+waitfor vrRendering == 1 60
+wait 3
+
+key 0x77
+waitfor vrRendering == 0 20
+wait 2
+key 0x77
+waitfor vrRendering == 1 60
+wait 3
+
+key 0x77
+waitfor vrRendering == 0 20
+wait 2
+key 0x77
+waitfor vrRendering == 1 60
+wait 3
+
+# After the restarts the simulated hands are tracked and the laser reaches the menu again.
+head 0 1.6 0  0 0 0
+hand right 0 1.6 0  6.2 -25 0
+recenter
+wait 2
+expect rightHandValid == 1
+expect motionActive == 1
+expect laserOnPanel == 1
+expect stereoWeapon == 1
+expect fps > 45
