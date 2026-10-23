@@ -33,12 +33,12 @@ internal sealed unsafe class VirtualGamepad
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     private struct GamepadStateEvent
     {
-        // InputEvent header (NativeInputEvent: type, size, device, id, time; packed to 20 bytes)
+        // InputEvent header (NativeInputEvent: type, size, device, time, id; packed to 20 bytes)
         public int Type;
         public ushort SizeInBytes;
         public ushort DeviceId;
-        public int EventId;
         public double Time;
+        public int EventId;
         // StateEvent
         public int StateFormat;
         // GamepadState
@@ -119,7 +119,7 @@ internal sealed unsafe class VirtualGamepad
             Type = StateEventType,
             SizeInBytes = (ushort)sizeof(GamepadStateEvent),
             DeviceId = (ushort)_device.deviceId,
-            Time = InputState.currentTime,
+            Time = InputEventTime.Now,
             StateFormat = GamepadFormat,
             Buttons = BuildButtons(controllers),
             LeftStickX = leftStick.x,
