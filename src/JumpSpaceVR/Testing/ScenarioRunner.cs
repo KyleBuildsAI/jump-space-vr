@@ -25,6 +25,7 @@ namespace JumpSpaceVR.Testing;
 ///   config StabilizeView false                change a mod setting for this run only (restored when it ends)
 ///   pad rightstick 1 0                        scripted gamepad: leftstick/rightstick x y, lefttrigger/righttrigger v,
 ///                                             a/b/x/y/start/view 0|1, release (see TestGamepad)
+///   print fps cpuMainMs                       log metric values without checking them
 ///   snapshot | diagnostics | recenter | log text | quit
 /// </summary>
 internal sealed class ScenarioRunner
@@ -164,6 +165,11 @@ internal sealed class ScenarioRunner
                     break;
                 case "expect":
                     Expect(parts[1], parts[2], Number(parts[3]), parts.Length > 4 ? Number(parts[4]) : 0.001f);
+                    break;
+                case "print":
+                    // Records measurements without judging them (frame rates, timings).
+                    for (var index = 1; index < parts.Length; index++)
+                        Log.Msg($"[scenario] {parts[index]} = {Format(_metric(parts[index]))}");
                     break;
                 case "log":
                     Log.Msg("[scenario] " + step.Substring(4).Trim());

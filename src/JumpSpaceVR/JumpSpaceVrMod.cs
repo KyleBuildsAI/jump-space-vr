@@ -123,6 +123,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         _frameCount++;
         Diagnostics.RecordFrame();
+        FrameTimings.Record();
         _cameraRig.RestoreGamePose();
         _motion.RestoreWeapon();
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
@@ -450,6 +451,9 @@ public sealed class JumpSpaceVrMod : MelonMod
             "memoryMb" => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024f * 1024f),
             "eyeJolt" => _eyeHeights.MaxSpeedChange * 100f,
             "worstFrameMs" => Diagnostics.WorstFrameMs,
+            "cpuMainMs" => FrameTimings.CpuMainMs,
+            "cpuRenderMs" => FrameTimings.CpuRenderMs,
+            "gpuMs" => FrameTimings.GpuMs,
             "vrRendering" => _runtime != null && _runtime.IsRendering ? 1f : 0f,
             "inLevel" => IsInLevel() ? 1f : 0f,
             "cameraYaw" => cameraYaw,
