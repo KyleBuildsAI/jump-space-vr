@@ -60,6 +60,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private float _menuChordStart = -1f;
     private bool _menuChordFired;
     private const float MenuChordSeconds = 1f;
+    private const float RoomscaleLostDistance = 1.2f;
     private readonly ConformanceInputDriver _mockInput = new();
     private Testing.ScenarioRunner _scenario;
     private readonly HotkeyReader _hotkeys = new();
@@ -855,6 +856,14 @@ public sealed class JumpSpaceVrMod : MelonMod
                 var roomscaleStep = _roomscale.ConsumeCharacterStep(_cameraRig.GamePosition, _cameraRig.ViewRotation);
                 if (roomscaleStep != Vector3.zero)
                     _headTracker.ShiftOrigin(roomscaleStep / Mathf.Max(0.01f, _config.WorldScale.Value));
+                // Room-scale keeps the character under the player, so a head this far from it means the view and the
+                // body lost each other (the view left behind while the body runs on): recenter instead of staying lost.
+                var headLocal = new Vector2(_headTracker.LocalPosition.x, _headTracker.LocalPosition.z);
+                if (_config.RoomscaleWalking.Value && !_pads.GamepadActive && headLocal.magnitude > RoomscaleLostDistance)
+                {
+                    Log.Warning($"View was {headLocal.magnitude:F1} m from the character; recentering.");
+                    _recenterPending = true;
+                }
 
                 var controllers = _lastControllerState;
                 var laserPointer = _headTracker.Localize(controllers.RightPointer, positional);
