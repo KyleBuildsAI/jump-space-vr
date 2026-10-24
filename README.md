@@ -48,6 +48,9 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
   controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal. The laser
   steadies itself, snaps onto the nearest button and holds still while you pull the trigger.
+- **Co-op hands (new, needs testing with friends).** Players who all run the mod see each other's VR hands move:
+  arms reach where the other player's controllers are, including holding the gun with two hands. The host needs
+  the mod too; players without it see the normal game. Turn it off with "Multiplayer hands (co-op)".
 - **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
   chair), your view stays in your character's head.
 - **Mod menu (Insert).** An in-headset settings menu, grouped into pages so everything fits: View and comfort, UI and
@@ -167,6 +170,7 @@ launch with the mod.
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
 | `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
+| `ShareHands` | `true` | Co-op: send your VR hands to other modded players and show theirs (the host needs the mod). |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
 
@@ -288,6 +292,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `feel-and-look.txt` (~2 min) | In the hangar: head-tracked audio updates, vibration on firing and grabbing, colour grading on/off |
 | `gamepad.txt` (~2 min) | In the hangar with a scripted gamepad: using it turns motion aim off and the view follows the camera; firing rumbles; left trigger shifts the sights; View held opens the menu; the VR controllers take over again; `Gamepad` mode keeps the pad |
 | `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
+| `hand-sync.txt` (~2 min) | In the hangar: with the loopback option our shared hands go through the network format onto our own third-person arms (hand error under 6 cm), with and without weapon in hand; off shows nothing |
 | `first-person.txt` (~2 min) | In the hangar: normal first-person play never triggers the third-person override; "level" is the world there |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
