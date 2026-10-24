@@ -516,6 +516,9 @@ public sealed class JumpSpaceVrMod : MelonMod
             "barrelYaw" => _motion.Arms.Barrel.HasValue
                 ? Mathf.DeltaAngle(_cameraRig.ViewRotation.eulerAngles.y, Quaternion.LookRotation(_motion.Arms.Barrel.Value.direction).eulerAngles.y)
                 : null,
+            "locatorChildren" => _motion.ItemSlots.Locator,
+            "socketChildren" => _motion.ItemSlots.Socket,
+            "itemPlaceErrorCm" => _motion.WeaponInHand ? _motion.Arms.ItemPlacementError * 100f : null,
             "gripHighlight" => GameObject.Find("JumpSpaceVR_GripHighlight") != null ? 1f : 0f,
             "twoHanded" => _motion.Arms.TwoHanded ? 1f : 0f,
             "canGrab" => _motion.Arms.CanGrab ? 1f : 0f,
@@ -610,6 +613,10 @@ public sealed class JumpSpaceVrMod : MelonMod
                 break;
             case "galaxymap":
                 OpenGalaxyMap();
+                break;
+            case "itemtohand":
+                if (!_motion.MoveItemToHandSocket())
+                    throw new InvalidOperationException("no held item or hand socket");
                 break;
             case "rig":
                 Log.Msg("First-person rig hierarchy:" + Environment.NewLine + _motion.DescribeRigHierarchy());

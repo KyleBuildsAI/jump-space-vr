@@ -83,13 +83,45 @@ internal sealed class MotionControls
     }
 
     /// <summary>True when the player's first-person rig holds an item (a gun in the hangar or a mission).</summary>
+    /// <summary>Test scenarios: hangs the held item on the right hand's socket, as some spawns do.</summary>
+    public bool MoveItemToHandSocket()
+    {
+        var weapon = FindWeapon();
+        var locator = weapon != null ? FindItemLocator(weapon) : null;
+        var socket = weapon != null ? FindHandSocket(weapon) : null;
+        if (socket != null && socket.childCount > 0)
+            return true;
+        if (locator == null || socket == null || locator.childCount == 0)
+            return false;
+        RestoreWeapon();
+        while (locator.childCount > 0)
+            locator.GetChild(0).SetParent(socket, true);
+        return true;
+    }
+
+    /// <summary>Children of the item locator and of the right hand's socket (for tests), or -1 without them.</summary>
+    public (int Locator, int Socket) ItemSlots
+    {
+        get
+        {
+            var weapon = FindWeapon();
+            var locator = weapon != null ? FindItemLocator(weapon) : null;
+            var socket = weapon != null ? FindHandSocket(weapon) : null;
+            return (locator != null ? locator.childCount : -1, socket != null ? socket.childCount : -1);
+        }
+    }
+
     public bool HoldsItem
     {
         get
         {
             var weapon = FindWeapon();
             var locator = weapon != null ? FindItemLocator(weapon) : null;
-            return locator != null && locator.childCount > 0;
+            if (locator != null && locator.childCount > 0)
+                return true;
+            // Some spawns hang the item on the right hand's socket instead.
+            var socket = weapon != null ? FindHandSocket(weapon) : null;
+            return socket != null && socket.childCount > 0;
         }
     }
 
@@ -247,6 +279,20 @@ internal sealed class MotionControls
 
     private Transform _locator;
     private int _locatorOwnerId;
+
+    private Transform FindHandSocket(Transform rig)
+    {
+        var id = rig.GetInstanceID();
+        // Remembered per rig, also when there is none (searching the whole skeleton every frame would be costly).
+        if (id == _socketOwnerId)
+            return _socket;
+        _socketOwnerId = id;
+        _socket = VrArms.Find(rig, VrArms.HandSocketName);
+        return _socket;
+    }
+
+    private int _socketOwnerId;
+    private Transform _socket;
 
     private Transform FindItemLocator(Transform rig)
     {
