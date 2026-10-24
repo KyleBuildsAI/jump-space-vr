@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.5.0", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.6.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
