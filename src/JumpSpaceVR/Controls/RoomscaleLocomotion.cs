@@ -18,6 +18,9 @@ internal sealed class RoomscaleLocomotion
     private bool _hasLastPosition;
     private bool _drivingLastFrame;
 
+    /// <summary>True on frames where the character walks because the player physically stepped.</summary>
+    public bool Driving => _drivingLastFrame;
+
     /// <summary>
     /// Adds a walk input toward the head (body-frame stick: x right, y forward) to the player's own stick input.
     /// </summary>

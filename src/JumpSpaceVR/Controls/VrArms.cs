@@ -225,19 +225,22 @@ internal sealed class VrArms
             _rigBaseRotation = _rig.localRotation;
         }
 
+        // The body rotation is already level with the character's floor (a rolled ship tilts it), so stand the body
+        // on that floor rather than upright in the world.
         var joint = _cameraJoint.position;
-        var upright = Quaternion.Euler(0f, bodyRotation.eulerAngles.y, 0f);
-        var turn = upright * Quaternion.Inverse(_rig.rotation);
-        _rig.SetPositionAndRotation(joint + turn * (_rig.position - joint), upright);
+        var turn = bodyRotation * Quaternion.Inverse(_rig.rotation);
+        _rig.SetPositionAndRotation(joint + turn * (_rig.position - joint), bodyRotation);
 
+        var up = bodyRotation * Vector3.up;
         var offset = head - _cameraJoint.position;
-        offset.y = Mathf.Clamp(offset.y, -MaxBodyDrop, 0f);
+        var rise = Vector3.Dot(offset, up);
+        offset += up * (Mathf.Clamp(rise, -MaxBodyDrop, 0f) - rise);
         _rig.position += offset;
         _rigMoved = true;
 
         var remaining = head - _cameraJoint.position;
-        BodyHeadDistance = new Vector2(remaining.x, remaining.z).magnitude;
-        BodyYawError = Mathf.DeltaAngle(bodyRotation.eulerAngles.y, _rig.eulerAngles.y);
+        BodyHeadDistance = (remaining - up * Vector3.Dot(remaining, up)).magnitude;
+        BodyYawError = Quaternion.Angle(bodyRotation, _rig.rotation);
     }
 
     private void UpdateGrabState(HandPose rightHand, Quaternion rightAim, HandPose? leftHand, float leftGrip, HandPose rightInWeapon, HandPose leftInWeapon)

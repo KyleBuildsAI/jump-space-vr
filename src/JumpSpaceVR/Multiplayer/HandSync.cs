@@ -52,6 +52,13 @@ internal sealed unsafe class HandSync
 
     private readonly Dictionary<ulong, Remote> _remotes = new();
     private readonly HashSet<ulong> _moddedClients = new();
+    // When each modded client was last heard from; a client that left stops sending (even probes) and is dropped.
+    private readonly Dictionary<ulong, float> _lastHeard = new();
+    private readonly List<ulong> _departed = new();
+    private const float ClientTimeoutSeconds = 10f;
+    // A body without arm bones is looked at again after this long, not every frame.
+    private const float ArmRetrySeconds = 5f;
+    private readonly Dictionary<int, float> _armRetryAt = new();
     private readonly Dictionary<ulong, Il2Cpp.PlayerController> _players = new();
     private readonly Dictionary<int, (Arm Left, Arm Right)> _arms = new();
     private readonly byte[] _sendBuffer = new byte[HandPoseFrame.Size];
@@ -139,6 +146,7 @@ internal sealed unsafe class HandSync
         var haveHands = _localCapturedAt >= 0f && now - _localCapturedAt < StaleSeconds;
         if (manager.IsServer)
         {
+            DropDepartedClients(now);
             // Host: our hands to every modded client, or a heartbeat so their probes know the host has the mod.
             _nextSend = now + (haveHands ? SendInterval : HeartbeatInterval);
             if (_moddedClients.Count > 0)
@@ -171,8 +179,17 @@ internal sealed unsafe class HandSync
 
             remote.Shown = remote.HasShown ? Blend(remote.Shown, remote.Target, blend) : remote.Target;
             remote.HasShown = true;
-            if (Apply(player, remote.Shown))
-                RemotesShown++;
+            try
+            {
+                if (Apply(player, remote.Shown))
+                    RemotesShown++;
+            }
+            catch (Exception exception)
+            {
+                // One player's broken body must not stop the others' hands (or log every frame for them).
+                Log.Warning($"Multiplayer hands: could not show client {origin}'s hands: {exception.Message}");
+                remote.LastReceived = -StaleSeconds;
+            }
         }
     }
 
@@ -181,6 +198,8 @@ internal sealed unsafe class HandSync
     {
         _remotes.Clear();
         _moddedClients.Clear();
+        _lastHeard.Clear();
+        _armRetryAt.Clear();
         _players.Clear();
         _arms.Clear();
         _lastHostFrame = -1f;
@@ -250,6 +269,8 @@ internal sealed unsafe class HandSync
 
     private void OnMessage(ulong sender, FastBufferReader reader)
     {
+        if (!Enabled)
+            return;
         try
         {
             if (reader.Length - reader.Position < HandPoseFrame.Size)
@@ -267,6 +288,7 @@ internal sealed unsafe class HandSync
             {
                 // A client speaks for itself only; pass its hands on to the other modded clients.
                 frame.Origin = sender;
+                _lastHeard[sender] = Time.unscaledTime;
                 if (_moddedClients.Add(sender))
                     Log.Msg($"Multiplayer hands: client {sender} has the mod.");
                 frame.Write(_receiveBuffer);
@@ -350,11 +372,34 @@ internal sealed unsafe class HandSync
         var id = body.GetInstanceID();
         if (_arms.TryGetValue(id, out var arms) && arms.Left?.Hand != null && arms.Right?.Hand != null)
             return arms;
+        // A body still loading (or without the expected bones) is searched again every few seconds, not every frame.
+        if (_armRetryAt.TryGetValue(id, out var retryAt) && Time.unscaledTime < retryAt)
+            return default;
         arms = (FindArm(body, "Left"), FindArm(body, "Right"));
         _arms[id] = arms;
         if (arms.Left == null || arms.Right == null)
-            Log.Warning($"Multiplayer hands: no arm bones under {body.name}.");
+        {
+            _armRetryAt[id] = Time.unscaledTime + ArmRetrySeconds;
+            Log.Warning($"Multiplayer hands: no arm bones under {body.name} yet.");
+        }
         return arms;
+    }
+
+    private void DropDepartedClients(float now)
+    {
+        _departed.Clear();
+        foreach (var client in _moddedClients)
+        {
+            if (!_lastHeard.TryGetValue(client, out var heard) || now - heard > ClientTimeoutSeconds)
+                _departed.Add(client);
+        }
+        foreach (var client in _departed)
+        {
+            _moddedClients.Remove(client);
+            _lastHeard.Remove(client);
+            _remotes.Remove(client);
+            Log.Msg($"Multiplayer hands: client {client} stopped sending; no longer sending to it.");
+        }
     }
 
     private static Arm FindArm(Transform body, string side)

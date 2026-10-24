@@ -39,3 +39,15 @@ snapshot
 config GraphicsQuality Game
 wait 2
 expect eyeVolumetrics == 1
+
+# Turning VR off (F8) hands the game camera its own settings back, even at Low.
+config GraphicsQuality Low
+wait 3
+expect gameVolumetrics == 0
+key 0x77
+waitfor vrRendering == 0 20
+wait 2
+expect gameVolumetrics == 1
+key 0x77
+waitfor vrRendering == 1 60
+wait 3
