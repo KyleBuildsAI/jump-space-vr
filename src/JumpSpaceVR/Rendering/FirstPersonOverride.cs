@@ -39,6 +39,17 @@ internal sealed class FirstPersonOverride
     /// </summary>
     public Vector3? Update(bool enabled, Camera camera, bool cutscene)
     {
+        var wasActive = Active;
+        var head = Place(enabled, camera, cutscene);
+        if (Active != wasActive)
+            Log.Msg(Active
+                ? $"Game camera went third person ({CameraDistance:F1} m from the head); keeping your view in the head."
+                : "Game camera back in first person.");
+        return head;
+    }
+
+    private Vector3? Place(bool enabled, Camera camera, bool cutscene)
+    {
         Active = false;
         CameraDistance = 0f;
         try
@@ -55,7 +66,10 @@ internal sealed class FirstPersonOverride
             CameraDistance = Vector3.Distance(camera.transform.position, head.position);
             // Only the game's own third-person mode (it shows the body then; while we hide it, stay on), and only
             // with the camera on a spring arm near the character: map and scripted cameras are seen from where they are.
-            var thirdPerson = _toggler != null && (_toggler.IsShowingThirdPersonBody || _hiding);
+            // The game's third-person views use their own camera; the first-person camera lives under the character's
+            // camera controller (and the game may report the body as shown even then, e.g. in the prologue).
+            var thirdPerson = _toggler != null && (_toggler.IsShowingThirdPersonBody || _hiding) &&
+                              camera.GetComponentInParent<Il2Cpp.CameraController_Character>() == null;
             if (!thirdPerson || CameraDistance < ThirdPersonDistance || CameraDistance > MaxSpringArmDistance)
             {
                 Hide(false);

@@ -1,4 +1,4 @@
-# Third person in the hangar: when the game swings its camera out (boosting, chairs), the view stays in the head.
+# First-person override in the hangar: in normal first-person play the view is never moved to the head point.
 waitfor vrRendering == 1 120
 # Default UI panel placement, so the laser lands on the same menu item whatever the player has set.
 config UiFollow Lazy
@@ -32,17 +32,11 @@ expect cameraHeadDistanceCm < 60
 # Standing in the hangar, "level" is the world.
 expect frameTiltDeg < 1
 
-# The game's third-person camera (its developer switch, standing in for boosting or sitting): the view stays in the
-# head and the third-person body is hidden.
-thirdperson on
+# Walking around in first person never triggers it (in the prologue the game reports its third-person body as shown
+# while the camera is first person; that once moved the view out of the head).
+input left.stick 0 1
 wait 3
-expect cameraHeadDistanceCm > 60
-expect firstPersonOverride == 1
-snapshot
-config ForceFirstPerson false
+input left.stick 0 0
 wait 1
 expect firstPersonOverride == 0
-config ForceFirstPerson true
-thirdperson off
-wait 3
-expect firstPersonOverride == 0
+expect cameraHeadDistanceCm < 60

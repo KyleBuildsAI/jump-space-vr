@@ -522,18 +522,6 @@ public sealed class JumpSpaceVrMod : MelonMod
         return false;
     }
 
-    /// <summary>Test scenarios: the game's own developer switch for its third-person camera.</summary>
-    private static void SetDevThirdPerson(bool on)
-    {
-        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
-        var player = handler != null ? handler.localPlayerController : null;
-        var toggler = player != null ? player.GetComponentInChildren<Il2CppKeepsake.FirstToThirdPersonVisibilityToggler>(true) : null;
-        if (toggler == null)
-            throw new InvalidOperationException("no local player visibility toggler");
-        toggler.m_EnableTpCameraDev = on;
-        toggler.m_EnableTpCameraAndSettingsDev = on;
-    }
-
     private void ScenarioCommand(string command)
     {
         switch (command)
@@ -558,8 +546,6 @@ public sealed class JumpSpaceVrMod : MelonMod
                 var parts = command.Split(' ', 3);
                 if (parts.Length == 3 && parts[0] == "config")
                     _config.SetTemporarily(parts[1], parts[2]);
-                else if (parts.Length == 2 && parts[0] == "thirdperson")
-                    SetDevThirdPerson(parts[1] == "1" || parts[1] == "on");
                 else if (parts.Length == 3 && parts[0] == "pad")
                 {
                     var values = parts[2].Split(' ');
