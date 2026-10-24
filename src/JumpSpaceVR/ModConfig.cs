@@ -34,6 +34,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<Controls.AimEye> AimEye { get; }
     public MelonPreferences_Entry<float> ViewDistance { get; }
     public MelonPreferences_Entry<float> ShadowDistance { get; }
+    public MelonPreferences_Entry<string> DebugFrameSettingsOff { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> ShowCrosshair { get; }
     public MelonPreferences_Entry<bool> CurvedUi { get; }
@@ -125,6 +126,8 @@ internal sealed class ModConfig
             "your character's head instead.");
         AimEye = _category.CreateEntry("AimEye", Controls.AimEye.Right, "Aim with eye",
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
+        DebugFrameSettingsOff = _category.CreateEntry("DebugFrameSettingsOff", "", "Debug: frame settings off",
+            "Developer option for measuring frame rate: HDRP frame settings to switch off on the eye cameras, comma separated.");
         ShadowDistance = _category.CreateEntry("ShadowDistance", 0f, "VR shadow distance (m)",
             "How far sun shadows reach in VR. Each eye draws them again, so a shorter distance saves CPU time. 0 is automatic: " +
             "40 m at VR graphics Low, 80 m at Medium, the game's own distance otherwise.");

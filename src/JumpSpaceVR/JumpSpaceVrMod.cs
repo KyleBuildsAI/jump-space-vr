@@ -431,6 +431,8 @@ public sealed class JumpSpaceVrMod : MelonMod
             "handFramesReceived" => _handSync.FramesReceived,
             "firstPersonOverride" => _firstPerson.Active ? 1f : 0f,
             "mapView" => _mapView ? 1f : 0f,
+            "planarProbes" => UnityEngine.Object.FindObjectsByType<UnityEngine.Rendering.HighDefinition.PlanarReflectionProbe>(FindObjectsSortMode.None).Length,
+            "realtimeProbes" => CountRealtimeProbes(),
             "cameraX" => camera != null ? camera.transform.position.x : null,
             "cameraZ" => camera != null ? camera.transform.position.z : null,
             "viewPitch" => -Mathf.DeltaAngle(0f, _cameraRig.ViewRotation.eulerAngles.x),
@@ -633,6 +635,17 @@ public sealed class JumpSpaceVrMod : MelonMod
         _uiCompositor.CursorUv = new Vector2(assisted.x / Screen.width, assisted.y / Screen.height);
         _pointerScreen = assisted;
         _pointerOwnsCursor = !inLevel;
+    }
+
+    private static int CountRealtimeProbes()
+    {
+        var count = 0;
+        foreach (var probe in UnityEngine.Object.FindObjectsByType<UnityEngine.Rendering.HighDefinition.HDProbe>(FindObjectsSortMode.None))
+        {
+            if (probe != null && probe.isActiveAndEnabled && probe.mode == UnityEngine.Rendering.HighDefinition.ProbeSettings.Mode.Realtime)
+                count++;
+        }
+        return count;
     }
 
     private bool _mapView;
@@ -986,6 +999,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             _cameraRig.Dlss = _config.Dlss.Value;
             _cameraRig.Quality = _config.GraphicsQuality.Value;
+            _cameraRig.ExtraFrameSettingsOff = _config.DebugFrameSettingsOff.Value;
             _headAudio.Enabled = _config.HeadTrackedAudio.Value;
             if (Time.frameCount >= _cutsceneCheckFrame)
             {

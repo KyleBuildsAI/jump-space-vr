@@ -356,10 +356,19 @@ internal sealed class VrCameraRig
         _camera.allowDynamicResolution = enabled;
     }
 
+    /// <summary>Developer option: extra frame settings to switch off (see <see cref="GraphicsQuality.SetExtraOff"/>).</summary>
+    public string ExtraFrameSettingsOff { get; set; } = "";
+    private string _appliedExtra = "";
+
     private void ApplyQuality()
     {
-        if (_sourceData == null || (Quality == _appliedQuality && _sourceData == _appliedQualityData))
+        if (_sourceData == null || (Quality == _appliedQuality && _sourceData == _appliedQualityData && ExtraFrameSettingsOff == _appliedExtra))
             return;
+        if (ExtraFrameSettingsOff != _appliedExtra)
+        {
+            _graphicsQuality.SetExtraOff(ExtraFrameSettingsOff);
+            _appliedExtra = ExtraFrameSettingsOff;
+        }
         _graphicsQuality.Apply(_sourceData, Quality);
         _graphicsQuality.Apply(_rightEyeData, Quality);
         _appliedQuality = Quality;
