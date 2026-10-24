@@ -17,6 +17,7 @@ Quest 3 / 3S / 2 / Pro Touch controllers, Valve Index, Windows Mixed Reality and
 
 Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
 [Releases](https://github.com/KyleBuildsAI/jump-space-vr/releases). `QUICKSTART.txt` in the zip has the controls.
+What changed: [CHANGELOG](CHANGELOG.md). What still needs checking in a headset: [checklist](docs/HARDWARE-CHECKLIST.md).
 
 > Status: early access, like the game. Played on a Quest 3 over Steam Link and tested headlessly against Unity's
 > OpenXR mock runtime. Expect rough edges in specific game screens; please report them in
