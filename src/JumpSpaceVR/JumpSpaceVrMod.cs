@@ -47,6 +47,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly Tracking.HeadAudio _headAudio = new();
     private readonly HapticFeedback _haptics = new();
     private readonly ColorGrading _colorGrading = new();
+    private readonly Multiplayer.HandSync _handSync = new();
     private float _aimDownSights;
     private Vector3 _lastSightShift;
     private ControllerState _rawControllerState;
@@ -125,6 +126,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         UpdatePhysicalGamepads();
         HandleHotkeys();
         UpdateControllers();
+        if (_runtime != null && _runtime.IsRendering)
+            _handSync.Update();
         if (_runtime != null && _runtime.IsRendering)
             _sessionReport.RecordFrame(Time.unscaledDeltaTime, _rawControllerState, _pointerScreen.HasValue, IsInLevel(),
                 _motion.WeaponInHand, _eyeHeights.MaxSpeedChange * 100f);
@@ -218,6 +221,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Weapon in hand", _config.WeaponInHand);
         _modMenu.AddChoice("Aim down sights with eye", _config.AimEye);
         _modMenu.AddNumber("Left hand roll (degrees)", _config.LeftHandRoll, 15f, -180f, 180f, "0");
+        _modMenu.AddToggle("Multiplayer hands (co-op)", _config.ShareHands);
         _modMenu.AddNumber("Weapon offset X (right)", _config.WeaponOffsetX, 0.01f, -0.5f, 0.5f, "0.00");
         _modMenu.AddNumber("Weapon offset Y (up)", _config.WeaponOffsetY, 0.01f, -0.6f, 0.4f, "0.00");
         _modMenu.AddNumber("Weapon offset Z (forward)", _config.WeaponOffsetZ, 0.01f, -0.3f, 0.8f, "0.00");
@@ -401,6 +405,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "colorGradingOn" => GameObject.Find("JumpSpaceVR_ColorGrading")?.GetComponent<UnityEngine.Rendering.Volume>() is { } volume && volume.enabled ? 1f : 0f,
             "hapticPulses" => _runtime?.Controllers.HapticPulses ?? 0,
             "gamepadActive" => _pads.GamepadActive ? 1f : 0f,
+            "remoteHands" => _handSync.RemotesShown,
+            "remoteHandErrorCm" => _handSync.RemotesShown > 0 ? _handSync.LastHandError * 100f : null,
+            "handFramesSent" => _handSync.FramesSent,
+            "handFramesReceived" => _handSync.FramesReceived,
             "bodyHeadCm" => _motion.WeaponInHand ? _motion.Arms.BodyHeadDistance * 100f : null,
             "bodyYawError" => _motion.WeaponInHand ? _motion.Arms.BodyYawError : null,
             // Horizontal distance of the head from the recentered origin (room-scale keeps it small).
@@ -600,6 +608,32 @@ public sealed class JumpSpaceVrMod : MelonMod
     /// The game centres the sights on its camera, which in VR sits between the eyes, so aiming down sights makes you
     /// go cross-eyed. While aiming (left trigger), move the weapon so the sights line up with the chosen eye.
     /// </summary>
+    /// <summary>
+    /// Shares this frame's hands with other modded players (the hand bones while the weapon is in hand, otherwise the
+    /// controllers) and shows theirs. Call before rendering, after the local arms are placed.
+    /// </summary>
+    private void ShareHands(in ControllerState controllers, bool positional)
+    {
+        _handSync.Enabled = _config.ShareHands.Value;
+        _handSync.Loopback = _config.HandSyncLoopback.Value;
+        if (_pads.GamepadActive)
+            _handSync.CaptureLocal(null, null, false);
+        else if (_motion.WeaponInHand && _motion.Arms.TryGetHandBones(out var leftBone, out var rightBone))
+            _handSync.CaptureLocal(leftBone, rightBone, rotations: true);
+        else
+            _handSync.CaptureLocal(WorldHand(controllers.LeftHand, positional), WorldHand(controllers.RightHand, positional), false);
+        _handSync.ApplyRemotes();
+    }
+
+    private HandPose? WorldHand(in TrackedPose raw, bool positional)
+    {
+        var pose = _headTracker.Localize(raw, positional);
+        if (!pose.IsValid)
+            return null;
+        return new HandPose(_cameraRig.GamePosition + _cameraRig.ViewRotation * (pose.Position * _config.WorldScale.Value),
+            _cameraRig.ViewRotation * pose.Rotation);
+    }
+
     private Vector3 SightShift()
     {
         var aimTrigger = _pads.GamepadActive ? _pads.LeftTrigger : _rawControllerState.LeftTrigger;
@@ -795,6 +829,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _mouse.Remove();
         _pointerScreen = null;
         _motion.Deactivate();
+        _handSync.Reset();
         FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
         _uiCompositor.Stop();
@@ -897,6 +932,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
                     _config.WeaponInHand.Value, SightShift(), _config.LeftHandRoll.Value,
                     (_cameraRig.LeftEye.transform.position + _cameraRig.RightEye.transform.position) * 0.5f);
+                ShareHands(controllers, positional);
             }
         }
         catch (Exception exception)
