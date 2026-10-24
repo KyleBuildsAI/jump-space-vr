@@ -30,7 +30,8 @@ CONTROLS
   F7 ... recenter     F8 ... VR on/off     F9 ... diagnostics     F10 ... save what the headset sees
 
 CO-OP
-  Friends who also have the mod see your hands move, and you see theirs. The host must have the mod too.
+  Beta: friends who also have the mod can see your hands move, and you see theirs. Everyone, including the host,
+  turns on "Multiplayer hands (co-op)" in the VR menu (Weapon and hands).
 
 PROBLEMS?
   - Choppy on a mid-range card (RTX 3060/4060/5060)? Insert menu > "Preset: slower graphics card",

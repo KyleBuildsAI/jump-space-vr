@@ -33,6 +33,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> HideCinematicBars { get; }
     public MelonPreferences_Entry<Controls.AimEye> AimEye { get; }
     public MelonPreferences_Entry<float> ViewDistance { get; }
+    public MelonPreferences_Entry<float> ShadowDistance { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> ShowCrosshair { get; }
     public MelonPreferences_Entry<bool> CurvedUi { get; }
@@ -124,6 +125,9 @@ internal sealed class ModConfig
             "your character's head instead.");
         AimEye = _category.CreateEntry("AimEye", Controls.AimEye.Right, "Aim with eye",
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
+        ShadowDistance = _category.CreateEntry("ShadowDistance", 0f, "VR shadow distance (m)",
+            "How far sun shadows reach in VR. Each eye draws them again, so a shorter distance saves CPU time. 0 is automatic: " +
+            "40 m at VR graphics Low, 80 m at Medium, the game's own distance otherwise.");
         ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
             "Multiplies how far the game draws (far clip plane and level of detail). Higher costs frame rate.");
         GraphicsQuality = _category.CreateEntry("GraphicsQuality", Rendering.VrGraphicsQuality.Game, "VR graphics",
@@ -141,8 +145,9 @@ internal sealed class ModConfig
         HapticStrength = _category.CreateEntry("HapticStrength", 0.7f, "Vibration strength", "0 to 1.");
         HeadTrackedAudio = _category.CreateEntry("HeadTrackedAudio", true, "Head-tracked audio",
             "Sound follows your head: turning your head turns what you hear (the game's listener otherwise follows its camera).");
-        ShareHands = _category.CreateEntry("ShareHands", true, "Multiplayer hands",
-            "Co-op: other players with the mod see your VR hands move, and you see theirs. Works when the host has the mod too.");
+        ShareHands = _category.CreateEntry("ShareHands", false, "Multiplayer hands",
+            "Co-op (beta): other players with the mod see your VR hands move, and you see theirs. Everyone who wants it, " +
+            "including the host, needs the mod with this switched on.");
         HandSyncLoopback = _category.CreateEntry("HandSyncLoopback", false, "Hand sync loopback",
             "Developer option: show your own shared hands on your own third-person body (tests the multiplayer hands path).");
         CurvedUi = _category.CreateEntry("CurvedUi", false, "Curved UI",

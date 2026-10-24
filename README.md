@@ -48,9 +48,9 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
   controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal. The laser
   steadies itself, snaps onto the nearest button and holds still while you pull the trigger.
-- **Co-op hands (0.9.0 pre-release, needs testing with friends).** Players who all run the mod see each other's VR hands move:
-  arms reach where the other player's controllers are, including holding the gun with two hands. The host needs
-  the mod too; players without it see the normal game. Turn it off with "Multiplayer hands (co-op)".
+- **Co-op hands (beta, off by default).** Players who all run the mod see each other's VR hands move: arms reach
+  where the other player's controllers are, including holding the gun with two hands. Everyone, including the host,
+  turns on "Multiplayer hands (co-op)" under Weapon and hands; players without the mod see the normal game.
 - **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
   chair), your view stays in your character's head.
 - **Mod menu (Insert).** An in-headset settings menu, grouped into pages so everything fits: View and comfort, UI and
@@ -60,7 +60,8 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
 - **Two-handed guns.** With "Weapon in hand" on, bring your left hand to the gun's fore-end (two blue rings show
   where) and hold grip to steady and aim the gun with both hands.
 - **Feel.** Head-tracked game audio, controller vibration, colour grading presets.
-- **Performance controls.** VR graphics levels and a one-click preset for mid-range cards.
+- **Performance controls.** VR graphics levels (which also shorten shadow distance), a shadow distance setting and a
+  one-click preset for mid-range cards. VR in this game is mostly limited by the CPU, which draws everything once per eye.
 - **DLSS in VR.** The game's built-in NVIDIA DLSS can be forced on for both eyes, for sharper edges or more frame
   rate at high render scales.
 - **Comfort.**
@@ -156,6 +157,7 @@ launch with the mod.
 | `ControllersAsGamepad` | `true` | Use VR controllers as a gamepad. |
 | `ControllerMode` | `Auto` | `Auto` uses whatever you touched last (VR controllers or a gamepad); `MotionControllers` or `Gamepad` always uses that one. |
 | `AimEye` | `Right` | While aiming down sights (left trigger), line the sights up with this eye: `Right`, `Left` or `Center`. |
+| `ShadowDistance` | `0` | How far sun shadows reach in VR, in meters. 0 is automatic: 40 m at VR graphics Low, 80 m at Medium (each eye draws shadows again; about +10% frame rate at Low). |
 | `ViewDistance` | `1.0` | Draw distance multiplier (level of detail and far clip), 0.5–4. Higher costs frame rate. |
 | `ShowFrameRate` | `false` | Show the frame rate in the top-left of the UI panel. |
 | `GraphicsQuality` | `Game` | VR graphics: `Game` keeps the game's settings; `High` drops motion blur, depth of field and lens effects; `Medium` also SSR/SSGI, contact shadows, volumetric clouds; `Low` also volumetric fog, ambient occlusion, refraction. The menu also has **Preset: slower graphics card** (Low, DLSS Performance, render scale 1.0, view distance 0.75). |
@@ -170,7 +172,7 @@ launch with the mod.
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
 | `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
-| `ShareHands` | `true` | Co-op: send your VR hands to other modded players and show theirs (the host needs the mod). |
+| `ShareHands` | `false` | Co-op (beta): send your VR hands to other modded players and show theirs (the host needs the mod with this on). |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
 

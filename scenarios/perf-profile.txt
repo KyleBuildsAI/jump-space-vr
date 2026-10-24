@@ -29,13 +29,24 @@ hand right 0.18 1.3 0.35  0 0 0
 wait 5
 
 # Where frame time goes in the hangar (measurements only; nothing is judged).
-log Player's settings: render scale 1.0, VR graphics Low, DLSS Ultra Performance, view distance 0.75
+expect holdsItem == 1
+log Player's settings: render scale 1.0, VR graphics Low, DLSS Ultra Performance, view distance 0.75, game's shadows
+config ShadowDistance 300
 config RenderScale 1.0
 config GraphicsQuality Low
 config Dlss UltraPerformance
 config ViewDistance 0.75
 wait 8
-print fps cpuMainMs cpuRenderMs gpuMs
+print fps
+log Same, automatic shadow distance for Low (40 m)
+config ShadowDistance 0
+wait 8
+print fps
+log Same, shadow distance 25 m
+config ShadowDistance 25
+wait 8
+print fps
+config ShadowDistance 0
 
 log Render scale 2.0, game graphics, DLSS off
 config RenderScale 2.0
@@ -43,13 +54,13 @@ config GraphicsQuality Game
 config Dlss Off
 config ViewDistance 1
 wait 8
-print fps cpuMainMs cpuRenderMs gpuMs
+print fps
 
 log Flat (VR off) for comparison
 key 0x77
 waitfor vrRendering == 0 20
 wait 8
-print fps cpuMainMs cpuRenderMs gpuMs
+print fps
 key 0x77
 waitfor vrRendering == 1 60
 wait 3
