@@ -16,7 +16,15 @@ input right.stickclick 0
 wait 0.5
 expect modMenuOpen == 1
 
-# Down four items to "Level horizon"; A toggles it off and on again (ends unchanged).
+# Down six items to "Level horizon"; A toggles it off and on again (ends unchanged).
+input left.stick 0 -1
+wait 0.15
+input left.stick 0 0
+wait 0.25
+input left.stick 0 -1
+wait 0.15
+input left.stick 0 0
+wait 0.25
 input left.stick 0 -1
 wait 0.15
 input left.stick 0 0
