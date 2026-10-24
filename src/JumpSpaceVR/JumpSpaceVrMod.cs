@@ -173,44 +173,62 @@ public sealed class JumpSpaceVrMod : MelonMod
 
     private void BuildModMenu()
     {
+        _modMenu.BeginPage("View and comfort");
+        _modMenu.AddToggle("Level horizon (comfort)", _config.LevelHorizon);
+        _modMenu.AddToggle("Remove head bob and shake", _config.StabilizeView);
+        _modMenu.AddToggle("Positional tracking (6DoF)", _config.PositionalTracking);
+        _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
+        _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
+        _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
+        _modMenu.EndPage();
+
+        _modMenu.BeginPage("UI and HUD");
         _modMenu.AddChoice("UI follow mode", _config.UiFollow, _ => _snapPanelToHead = true);
         _modMenu.AddToggle("Curved UI", _config.CurvedUi);
         _modMenu.AddNumber("Helmet HUD size (m)", _config.HelmetUiWidth, 0.05f, 0.6f, 2.4f, "0.00");
         _modMenu.AddNumber("UI smoothing (s)", _config.UiSmoothing, 0.02f, 0f, 1f, "0.00");
         _modMenu.AddNumber("UI size (m)", _config.UiWidth, 0.1f, 0.6f, 6f, "0.0");
         _modMenu.AddNumber("UI distance (m)", _config.UiDistance, 0.1f, 0.5f, 5f, "0.0");
-        _modMenu.AddToggle("Level horizon (comfort)", _config.LevelHorizon);
-        _modMenu.AddToggle("Remove head bob and shake", _config.StabilizeView);
-        _modMenu.AddToggle("Stereo weapon", _config.StereoWeapon);
-        _modMenu.AddToggle("Positional tracking (6DoF)", _config.PositionalTracking);
-        _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
-        _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
-        _modMenu.AddNumber("View distance", _config.ViewDistance, 0.25f, 0.5f, 4f, "0.00x");
         _modMenu.AddToggle("Show frame rate", _config.ShowFrameRate);
         _modMenu.AddToggle("Show crosshair", _config.ShowCrosshair);
-        _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
+        _modMenu.EndPage();
+
+        _modMenu.BeginPage("Graphics and performance");
         _modMenu.AddAction("Preset: slower graphics card", ApplyLowEndPreset);
+        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 3f, "0.0");
         _modMenu.AddChoice("VR graphics", _config.GraphicsQuality);
         _modMenu.AddChoice("DLSS (VR)", _config.Dlss);
+        _modMenu.AddNumber("View distance", _config.ViewDistance, 0.25f, 0.5f, 4f, "0.00x");
         _modMenu.AddChoice("Colour grading", _config.ColorPreset);
-        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 3f, "0.0");
-        _modMenu.AddChoice("Controls", _config.ControllerMode);
-        _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
-        _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
+        _modMenu.AddToggle("Stereo weapon", _config.StereoWeapon);
+        _modMenu.AddChoice("VR runtime (F8 twice to apply)", _config.Runtime);
+        _modMenu.EndPage();
+
+        _modMenu.BeginPage("Controls");
+        _modMenu.AddChoice("Controls (VR controllers or gamepad)", _config.ControllerMode);
         _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
         _modMenu.AddChoice("Turn mode", _config.TurnMode);
         _modMenu.AddNumber("Snap turn angle", _config.SnapTurnAngle, 15f, 15f, 90f, "0");
         _modMenu.AddNumber("Smooth turn speed", _config.SmoothTurnSpeed, 15f, 30f, 360f, "0");
+        _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
+        _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
+        _modMenu.EndPage();
+
+        _modMenu.BeginPage("Weapon and hands");
         _modMenu.AddToggle("Weapon in hand", _config.WeaponInHand);
         _modMenu.AddChoice("Aim down sights with eye", _config.AimEye);
         _modMenu.AddNumber("Left hand roll (degrees)", _config.LeftHandRoll, 15f, -180f, 180f, "0");
-        _modMenu.AddToggle("Head-tracked audio", _config.HeadTrackedAudio);
-        _modMenu.AddToggle("Controller vibration", _config.Haptics);
-        _modMenu.AddNumber("Vibration strength", _config.HapticStrength, 0.1f, 0f, 1f, "0.0");
         _modMenu.AddNumber("Weapon offset X (right)", _config.WeaponOffsetX, 0.01f, -0.5f, 0.5f, "0.00");
         _modMenu.AddNumber("Weapon offset Y (up)", _config.WeaponOffsetY, 0.01f, -0.6f, 0.4f, "0.00");
         _modMenu.AddNumber("Weapon offset Z (forward)", _config.WeaponOffsetZ, 0.01f, -0.3f, 0.8f, "0.00");
-        _modMenu.AddChoice("VR runtime (F8 twice to apply)", _config.Runtime);
+        _modMenu.EndPage();
+
+        _modMenu.BeginPage("Sound and vibration");
+        _modMenu.AddToggle("Head-tracked audio", _config.HeadTrackedAudio);
+        _modMenu.AddToggle("Controller vibration", _config.Haptics);
+        _modMenu.AddNumber("Vibration strength", _config.HapticStrength, 0.1f, 0f, 1f, "0.0");
+        _modMenu.EndPage();
+
         _modMenu.AddAction("Recenter view", () => _recenterPending = true);
         _modMenu.AddAction("Close", () => _modMenu.Close());
         _modMenu.AddConfirmedAction("Reset all settings", ResetAllSettings);
@@ -435,6 +453,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                 FirstPersonRenderFix.SkippedPassCount("FirstPersonCameraPrePass") + FirstPersonRenderFix.SkippedPassCount("FirstPersonCustomPass"),
             "stereoWeapon" => FirstPersonRenderFix.Enabled ? 1f : 0f,
             "modMenuOpen" => _modMenu.IsOpen ? 1f : 0f,
+            "modMenuOnPage" => _modMenu.PageTitle != null ? 1f : 0f,
             "cursorFree" => Cursor.lockState != CursorLockMode.Locked ? 1f : 0f,
             "cutscene" => IsCutscenePlaying() ? 1f : 0f,
             "mainMenu" => GameObject.Find("PF_MainMenu/Canvas") != null ? 1f : 0f,

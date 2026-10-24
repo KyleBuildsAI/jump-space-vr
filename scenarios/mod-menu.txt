@@ -1,5 +1,6 @@
-# The VR settings menu: opens with the controller gesture (hold right stick click), navigates with the left stick,
-# toggles with A, closes with B. Runs on the main menu (about 1 minute).
+# The VR settings menu: opens with the controller gesture (hold right stick click) on the main page of categories,
+# A opens a category, the left stick moves through it, A toggles, B goes back and then closes. Runs on the main menu
+# (about 1 minute).
 
 waitfor vrRendering == 1 120
 head 0 1.6 0  0 0 0
@@ -15,32 +16,14 @@ wait 1.4
 input right.stickclick 0
 wait 0.5
 expect modMenuOpen == 1
+expect modMenuOnPage == 0
 
-# Down six items to "Level horizon"; A toggles it off and on again (ends unchanged).
-input left.stick 0 -1
-wait 0.15
-input left.stick 0 0
-wait 0.25
-input left.stick 0 -1
-wait 0.15
-input left.stick 0 0
-wait 0.25
-input left.stick 0 -1
-wait 0.15
-input left.stick 0 0
-wait 0.25
-input left.stick 0 -1
-wait 0.15
-input left.stick 0 0
-wait 0.25
-input left.stick 0 -1
-wait 0.15
-input left.stick 0 0
-wait 0.25
-input left.stick 0 -1
-wait 0.15
-input left.stick 0 0
-wait 0.25
+# "View and comfort" is the first category; opening it selects its first setting, "Level horizon".
+input right.a 1
+wait 0.2
+input right.a 0
+wait 0.3
+expect modMenuOnPage == 1
 expect setting.LevelHorizon == 1
 input right.a 1
 wait 0.2
@@ -53,7 +36,30 @@ input right.a 0
 wait 0.3
 expect setting.LevelHorizon == 1
 
-# B closes the menu.
+# Down one: "Remove head bob and shake" toggles with left/right on the stick (and ends unchanged).
+input left.stick 0 -1
+wait 0.15
+input left.stick 0 0
+wait 0.25
+expect setting.StabilizeView == 1
+input left.stick 1 0
+wait 0.15
+input left.stick 0 0
+wait 0.25
+expect setting.StabilizeView == 0
+input left.stick 1 0
+wait 0.15
+input left.stick 0 0
+wait 0.25
+expect setting.StabilizeView == 1
+
+# B goes back to the categories, B again closes the menu.
+input right.b 1
+wait 0.2
+input right.b 0
+wait 0.3
+expect modMenuOpen == 1
+expect modMenuOnPage == 0
 input right.b 1
 wait 0.2
 input right.b 0
