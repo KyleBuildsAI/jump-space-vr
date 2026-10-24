@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.7.0", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.8.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -48,6 +48,10 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly HapticFeedback _haptics = new();
     private readonly ColorGrading _colorGrading = new();
     private readonly Multiplayer.HandSync _handSync = new();
+    private readonly VrUi.PointerAssist _pointerAssist = new();
+    private readonly Rendering.FirstPersonOverride _firstPerson = new();
+    private readonly Tracking.ReferenceFrame _frame = new();
+    private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
     private ControllerState _rawControllerState;
@@ -62,6 +66,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private bool _menuChordFired;
     private const float MenuChordSeconds = 1f;
     private const float RoomscaleLostDistance = 1.2f;
+    private int _cutsceneCheckFrame;
+    private bool _cutscene;
     private readonly ConformanceInputDriver _mockInput = new();
     private Testing.ScenarioRunner _scenario;
     private readonly HotkeyReader _hotkeys = new();
@@ -102,7 +108,13 @@ public sealed class JumpSpaceVrMod : MelonMod
         };
 
         // A new level or camera means a new "forward"; line the headset up with where the player is looking.
-        _cameraRig.CameraChanged += () => _recenterPending = true;
+        // Entering or leaving the game's third-person mode swaps cameras too; the view stays in the head then, so
+        // recentering would only jolt it.
+        _cameraRig.CameraChanged += () =>
+        {
+            if (!_firstPerson.RecentlyActive)
+                _recenterPending = true;
+        };
 
         Log.Msg($"Loaded. Toggle VR: {_config.ToggleVrKey.Value}, recenter: {_config.RecenterKey.Value}, diagnostics: {_config.DiagnosticsKey.Value}.");
     }
@@ -183,6 +195,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
         _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
+        _modMenu.AddToggle("Always first person", _config.ForceFirstPerson);
         _modMenu.EndPage();
 
         _modMenu.BeginPage("UI and HUD");
@@ -214,6 +227,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("Snap turn angle", _config.SnapTurnAngle, 15f, 15f, 90f, "0");
         _modMenu.AddNumber("Smooth turn speed", _config.SmoothTurnSpeed, 15f, 30f, 360f, "0");
         _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
+        _modMenu.AddToggle("Laser snaps to buttons", _config.PointerAssist);
         _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
         _modMenu.EndPage();
 
@@ -409,6 +423,11 @@ public sealed class JumpSpaceVrMod : MelonMod
             "remoteHandErrorCm" => _handSync.RemotesShown > 0 ? _handSync.LastHandError * 100f : null,
             "handFramesSent" => _handSync.FramesSent,
             "handFramesReceived" => _handSync.FramesReceived,
+            "firstPersonOverride" => _firstPerson.Active ? 1f : 0f,
+            "frameTiltDeg" => _frame.Tilt,
+            "cameraHeadDistanceCm" => _firstPerson.CameraDistance * 100f,
+            "pointerTargets" => _pointerAssist.TargetCount,
+            "pointerSnapped" => _pointerAssist.Snapped ? 1f : 0f,
             "bodyHeadCm" => _motion.WeaponInHand ? _motion.Arms.BodyHeadDistance * 100f : null,
             "bodyYawError" => _motion.WeaponInHand ? _motion.Arms.BodyYawError : null,
             // Horizontal distance of the head from the recentered origin (room-scale keeps it small).
@@ -577,10 +596,15 @@ public sealed class JumpSpaceVrMod : MelonMod
         var origin = _cameraRig.GamePosition + _cameraRig.ViewRotation * (pointer.Position * _config.WorldScale.Value);
         var direction = _cameraRig.ViewRotation * pointer.Rotation * Vector3.forward;
         if (!_uiCompositor.TryHitPanel(origin, direction, out var uv))
+        {
+            _pointerAssist.Reset();
             return;
+        }
 
-        _uiCompositor.CursorUv = uv;
-        _pointerScreen = new Vector2(uv.x * Screen.width, uv.y * Screen.height);
+        var raw = new Vector2(uv.x * Screen.width, uv.y * Screen.height);
+        var assisted = _config.PointerAssist.Value ? _pointerAssist.Assist(raw, _rawControllerState.RightTrigger) : raw;
+        _uiCompositor.CursorUv = new Vector2(assisted.x / Screen.width, assisted.y / Screen.height);
+        _pointerScreen = assisted;
         _pointerOwnsCursor = !inLevel;
     }
 
@@ -830,6 +854,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _pointerScreen = null;
         _motion.Deactivate();
         _handSync.Reset();
+        _firstPerson.Release();
         FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
         _uiCompositor.Stop();
@@ -883,9 +908,20 @@ public sealed class JumpSpaceVrMod : MelonMod
             var positional = _config.PositionalTracking.Value;
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);
+            var playerHandler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+            var localPlayer = playerHandler != null ? playerHandler.localPlayerController : null;
+            _frame.Update(localPlayer != null ? localPlayer.transform : null);
+            _motion.Frame = _frame.Rotation;
+            if (_frame.Tilt > 30f != _frameTilted)
+            {
+                _frameTilted = !_frameTilted;
+                Log.Msg(_frameTilted
+                    ? $"Level follows your character's floor (tilted {_frame.Tilt:F0} degrees from the world)."
+                    : "Level is the world again.");
+            }
             if (_resetBodyYaw && Camera.main != null)
             {
-                _motion.Body.Reset(Camera.main.transform.eulerAngles.y);
+                _motion.Body.Reset(_frame.YawOf(Camera.main.transform.rotation));
                 _resetBodyYaw = false;
             }
             float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
@@ -893,9 +929,15 @@ public sealed class JumpSpaceVrMod : MelonMod
             _cameraRig.Dlss = _config.Dlss.Value;
             _cameraRig.Quality = _config.GraphicsQuality.Value;
             _headAudio.Enabled = _config.HeadTrackedAudio.Value;
+            if (Time.frameCount >= _cutsceneCheckFrame)
+            {
+                _cutsceneCheckFrame = Time.frameCount + InLevelCheckIntervalFrames;
+                _cutscene = IsCutscenePlaying();
+            }
+            var firstPersonHead = _firstPerson.Update(_config.ForceFirstPerson.Value, Camera.main, _cutscene);
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
-                    _config.ClampedViewDistance))
+                    _config.ClampedViewDistance, firstPersonHead, _frame.Rotation))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;

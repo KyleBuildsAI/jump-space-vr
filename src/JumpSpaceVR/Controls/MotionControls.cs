@@ -126,6 +126,9 @@ internal sealed class MotionControls
             _instance = null;
     }
 
+    /// <summary>The character's floor frame (<see cref="Tracking.ReferenceFrame"/>); body yaw is measured in it.</summary>
+    public Quaternion Frame { get; set; } = Quaternion.identity;
+
     /// <summary>
     /// Per-frame input handling (call from Update, before the gamepad state is sent): the right stick turns the
     /// body instead of the camera, and the left stick is made body-relative.
@@ -140,7 +143,8 @@ internal sealed class MotionControls
         }
 
         var camera = Camera.main;
-        var gameYaw = camera != null ? camera.transform.eulerAngles.y : Body.Yaw;
+        // Yaws are measured around the character's own up (see ReferenceFrame), like the view.
+        var gameYaw = camera != null ? Tracking.ReferenceFrame.YawIn(Frame, camera.transform.rotation) : Body.Yaw;
         if (!Body.IsInitialized)
             Body.Reset(gameYaw);
 
