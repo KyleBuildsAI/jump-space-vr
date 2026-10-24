@@ -146,6 +146,37 @@ internal sealed unsafe class OpenXRControllers
             (Action.LeftStickClick, "/user/hand/left/input/thumbstick/click"),
             (Action.RightStickClick, "/user/hand/right/input/thumbstick/click"),
         }),
+        // Windows Mixed Reality: no face buttons, so the touchpad clicks stand in for A (right) and X (left) and the
+        // right menu button for B.
+        ("/interaction_profiles/microsoft/motion_controller", new[]
+        {
+            (Action.LeftStick, "/user/hand/left/input/thumbstick"),
+            (Action.RightStick, "/user/hand/right/input/thumbstick"),
+            (Action.LeftTrigger, "/user/hand/left/input/trigger/value"),
+            (Action.RightTrigger, "/user/hand/right/input/trigger/value"),
+            (Action.LeftGrip, "/user/hand/left/input/squeeze/click"),
+            (Action.RightGrip, "/user/hand/right/input/squeeze/click"),
+            (Action.ButtonA, "/user/hand/right/input/trackpad/click"),
+            (Action.ButtonB, "/user/hand/right/input/menu/click"),
+            (Action.ButtonX, "/user/hand/left/input/trackpad/click"),
+            (Action.Menu, "/user/hand/left/input/menu/click"),
+            (Action.LeftStickClick, "/user/hand/left/input/thumbstick/click"),
+            (Action.RightStickClick, "/user/hand/right/input/thumbstick/click"),
+        }),
+        // HTC Vive wands: the touchpads act as sticks and their clicks as A (right) and X (left).
+        ("/interaction_profiles/htc/vive_controller", new[]
+        {
+            (Action.LeftStick, "/user/hand/left/input/trackpad"),
+            (Action.RightStick, "/user/hand/right/input/trackpad"),
+            (Action.LeftTrigger, "/user/hand/left/input/trigger/value"),
+            (Action.RightTrigger, "/user/hand/right/input/trigger/value"),
+            (Action.LeftGrip, "/user/hand/left/input/squeeze/click"),
+            (Action.RightGrip, "/user/hand/right/input/squeeze/click"),
+            (Action.ButtonA, "/user/hand/right/input/trackpad/click"),
+            (Action.ButtonB, "/user/hand/right/input/menu/click"),
+            (Action.ButtonX, "/user/hand/left/input/trackpad/click"),
+            (Action.Menu, "/user/hand/left/input/menu/click"),
+        }),
         ("/interaction_profiles/khr/simple_controller", new[]
         {
             (Action.RightTrigger, "/user/hand/right/input/select/click"),
