@@ -25,6 +25,10 @@ expect letterboxVisible == 0
 
 # The first-person rig sits on the controller: its item locator lands on the grip.
 expect weaponInHand == 1
+# The weapon is drawn by the eye cameras (its layer is in their mask) and the game's flat first-person passes are
+# skipped; otherwise it is seen as two separate images.
+expect weaponLayerInEyes == 1
+expect flatWeaponPassSkips > 0
 expect itemLocator == 1
 expect gripErrorCm < 1
 snapshot

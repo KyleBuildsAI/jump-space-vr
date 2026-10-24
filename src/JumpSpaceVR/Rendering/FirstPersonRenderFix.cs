@@ -9,39 +9,55 @@ using UnityEngine.Rendering.HighDefinition;
 namespace JumpSpaceVR.Rendering;
 
 /// <summary>
-/// The game draws the first-person arms and weapon (layer 29) with its own HDRP custom pass, its own camera and
-/// its own field of view (Keepsake.FirstPersonCamera); the main camera excludes that layer. In a headset that
-/// pass produces the same flat image in both eyes, so the weapon cannot be fused and is seen double.
+/// The game draws the first-person arms and weapon (layer 29) with its own HDRP custom passes, a separate flat
+/// camera and its own field of view (Keepsake.FirstPersonCamera, its depth pre-pass and motion vectors, and the
+/// fullscreen FirstPersonCustomPass); the main camera excludes that layer. In a headset those passes produce the
+/// same flat image in both eyes, so the weapon cannot be fused and is seen double.
 ///
-/// While enabled, this skips the custom pass and adds the first-person layer to the eye cameras instead, so the
-/// weapon renders as normal scene geometry through the real per-eye projections.
+/// While enabled, this skips all of those passes and adds the first-person layer to the eye cameras instead, so
+/// the weapon renders as normal scene geometry through the real per-eye projections.
 /// </summary>
 internal static class FirstPersonRenderFix
 {
     private static bool _enabled;
     private static bool _hooked;
-    private static int _layerMask;
 
     public static bool Enabled => _enabled;
 
     /// <summary>True once the game's weapon pass can be skipped; without it the fix stays off (no double weapon).</summary>
     public static bool Hooked => _hooked;
 
+    // The main pass must be skippable for the fix to be safe; the others are skipped too when present.
+    private static readonly Type[] FirstPersonPasses =
+    {
+        typeof(FirstPersonCamera),
+        typeof(FirstPersonCameraPrePass),
+        typeof(FirstPersonCameraMotionVectors),
+        typeof(Il2Cpp.FirstPersonCustomPass),
+    };
+
+    private static readonly Dictionary<string, int> SkippedCalls = new();
+
     public static bool InstallHooks(HarmonyLib.Harmony harmony)
     {
-        try
+        foreach (var pass in FirstPersonPasses)
         {
-            // The base CustomPass declares more Execute overloads, so name the parameter list explicitly.
-            var execute = AccessTools.DeclaredMethod(typeof(FirstPersonCamera), nameof(FirstPersonCamera.Execute), new[] { typeof(CustomPassContext) });
-            harmony.Patch(execute, prefix: new HarmonyMethod(typeof(FirstPersonRenderFix), nameof(ExecutePrefix)));
-            _hooked = true;
-            return true;
+            try
+            {
+                // The base CustomPass declares more Execute overloads, so name the parameter list explicitly.
+                var execute = AccessTools.DeclaredMethod(pass, "Execute", new[] { typeof(CustomPassContext) });
+                if (execute == null)
+                    throw new MissingMethodException(pass.Name, "Execute");
+                harmony.Patch(execute, prefix: new HarmonyMethod(typeof(FirstPersonRenderFix), nameof(ExecutePrefix)));
+                if (pass == typeof(FirstPersonCamera))
+                    _hooked = true;
+            }
+            catch (Exception exception)
+            {
+                Log.Warning($"Could not hook first-person pass {pass.Name}: {exception.Message}");
+            }
         }
-        catch (Exception exception)
-        {
-            Log.Warning($"Could not hook the first-person weapon pass: {exception.Message}");
-            return false;
-        }
+        return _hooked;
     }
 
     public static void Apply(bool enabled)
@@ -53,29 +69,45 @@ internal static class FirstPersonRenderFix
         Log.Msg($"First-person weapon {(enabled ? "rendered in stereo by the eye cameras" : "back on the game's own pass")}.");
     }
 
-    /// <summary>Culling mask bit for the first-person layer, to add to eye cameras while the fix is active.</summary>
+    /// <summary>
+    /// Culling mask bit for the first-person layer, to add to eye cameras while the fix is active. Read every time:
+    /// the game sets the layer index once a level loads, and before that it reads 0 (which would add the Default
+    /// layer instead and leave the weapon out of the eye cameras).
+    /// </summary>
     public static int LayerMask
     {
         get
         {
             if (!_enabled)
                 return 0;
-            if (_layerMask == 0)
-            {
-                try
-                {
-                    _layerMask = 1 << FirstPersonCamera.LayerIndex;
-                }
-                catch (Exception)
-                {
-                    _layerMask = 1 << 29;
-                }
-            }
-            return _layerMask;
+            var layer = FirstPersonCamera.LayerIndex;
+            return 1 << (layer > 0 ? layer : DefaultFirstPersonLayer);
         }
     }
 
-    private static bool ExecutePrefix() => !_enabled;
+    private const int DefaultFirstPersonLayer = 29;
+
+    private static bool ExecutePrefix(CustomPass __instance)
+    {
+        if (!_enabled)
+            return true;
+        var name = __instance.GetIl2CppType().Name;
+        SkippedCalls[name] = SkippedCalls.TryGetValue(name, out var count) ? count + 1 : 1;
+        return false;
+    }
+
+    /// <summary>How often each first-person pass was skipped, for diagnostics and tests.</summary>
+    public static string DescribeSkippedPasses()
+    {
+        if (SkippedCalls.Count == 0)
+            return "none skipped";
+        var text = new StringBuilder();
+        foreach (var (name, count) in SkippedCalls)
+            text.Append($"{name}={count} ");
+        return text.ToString().TrimEnd();
+    }
+
+    public static int SkippedPassCount(string name) => SkippedCalls.TryGetValue(name, out var count) ? count : 0;
 
     /// <summary>Lists the hierarchies drawn on the first-person layer (arms, weapon) for diagnostics.</summary>
     public static string DescribeFirstPersonObjects()
@@ -106,6 +138,7 @@ internal static class FirstPersonRenderFix
             if (roots.Count >= 12)
                 break;
         }
-        return $"layer {layer}, fix active={_enabled}, renderers:\n    " + string.Join("\n    ", roots);
+        return $"layer {layer}, fix active={_enabled}, passes skipped: {DescribeSkippedPasses()}, renderers:\n    " +
+               string.Join("\n    ", roots);
     }
 }

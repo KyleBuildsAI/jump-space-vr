@@ -291,6 +291,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "weaponInHand" => _motion.WeaponInHand ? 1f : 0f,
             "itemLocator" => _motion.HasItemLocator ? 1f : 0f,
             "gripErrorCm" => _motion.LastGripError * 100f,
+            "weaponLayerInEyes" => _cameraRig.RightEye != null && FirstPersonRenderFix.Enabled &&
+                (_cameraRig.RightEye.cullingMask & (1 << 29)) != 0 ? 1f : 0f,
+            "flatWeaponPassSkips" => FirstPersonRenderFix.SkippedPassCount("FirstPersonCamera") +
+                FirstPersonRenderFix.SkippedPassCount("FirstPersonCameraPrePass") + FirstPersonRenderFix.SkippedPassCount("FirstPersonCustomPass"),
             "stereoWeapon" => FirstPersonRenderFix.Enabled ? 1f : 0f,
             "modMenuOpen" => _modMenu.IsOpen ? 1f : 0f,
             "cursorFree" => Cursor.lockState != CursorLockMode.Locked ? 1f : 0f,
