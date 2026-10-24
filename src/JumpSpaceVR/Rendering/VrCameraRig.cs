@@ -126,7 +126,8 @@ internal sealed class VrCameraRig
     /// Call from the before-render hook, after all gameplay camera updates.
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
-        bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null, float viewDistance = 1f)
+        bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null, float viewDistance = 1f,
+        Vector3? positionOverride = null)
     {
         if (!EnsureCameras())
             return false;
@@ -134,7 +135,8 @@ internal sealed class VrCameraRig
         _baseLocalPosition = _cameraTransform.localPosition;
         _baseLocalRotation = _cameraTransform.localRotation;
         GameCameraPosition = _cameraTransform.position;
-        var basePosition = stabilizeView ? StablePosition() : _cameraTransform.position;
+        var stablePosition = stabilizeView ? StablePosition() : _cameraTransform.position;
+        var basePosition = positionOverride ?? stablePosition;
         var baseRotation = _cameraTransform.rotation;
         GamePosition = basePosition;
         GameRotation = baseRotation;

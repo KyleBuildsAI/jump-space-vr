@@ -28,6 +28,8 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> StabilizeView { get; }
     public MelonPreferences_Entry<bool> RoomscaleWalking { get; }
     public MelonPreferences_Entry<bool> LaserPointer { get; }
+    public MelonPreferences_Entry<bool> PointerAssist { get; }
+    public MelonPreferences_Entry<bool> ForceFirstPerson { get; }
     public MelonPreferences_Entry<bool> HideCinematicBars { get; }
     public MelonPreferences_Entry<Controls.AimEye> AimEye { get; }
     public MelonPreferences_Entry<float> ViewDistance { get; }
@@ -113,6 +115,11 @@ internal sealed class ModConfig
         WeaponOffsetZ = _category.CreateEntry("WeaponOffsetZ", 0f, "Weapon grip offset Z (m)");
         LaserPointer = _category.CreateEntry("LaserPointer", true, "Laser pointer in menus",
             "In menus, point the right controller at the UI and pull the trigger to click.");
+        PointerAssist = _category.CreateEntry("PointerAssist", true, "Laser snaps to buttons",
+            "The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger.");
+        ForceFirstPerson = _category.CreateEntry("ForceFirstPerson", true, "Always first person",
+            "When the game switches to a third-person camera (boosting in space, sitting in a chair), keep your view in " +
+            "your character's head instead.");
         AimEye = _category.CreateEntry("AimEye", Controls.AimEye.Right, "Aim with eye",
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
         ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
