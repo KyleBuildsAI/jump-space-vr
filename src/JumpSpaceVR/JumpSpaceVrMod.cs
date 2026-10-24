@@ -382,6 +382,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "colorGradingOn" => GameObject.Find("JumpSpaceVR_ColorGrading")?.GetComponent<UnityEngine.Rendering.Volume>() is { } volume && volume.enabled ? 1f : 0f,
             "hapticPulses" => _runtime?.Controllers.HapticPulses ?? 0,
             "gamepadActive" => _pads.GamepadActive ? 1f : 0f,
+            "bodyHeadCm" => _motion.WeaponInHand ? _motion.Arms.BodyHeadDistance * 100f : null,
+            "bodyYawError" => _motion.WeaponInHand ? _motion.Arms.BodyYawError : null,
+            // Horizontal distance of the head from the recentered origin (room-scale keeps it small).
+            "headLocalCm" => new Vector2(_headTracker.LocalPosition.x, _headTracker.LocalPosition.z).magnitude * 100f,
             // How far the view's yaw is from the game camera's (motion aim turns the camera, not the view).
             "viewYawOffset" => Camera.main != null
                 ? Mathf.DeltaAngle(_cameraRig.ViewRotation.eulerAngles.y, Camera.main.transform.eulerAngles.y)
@@ -863,7 +867,8 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _rawControllerState.LeftGrip,
                     _config.WorldScale.Value,
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
-                    _config.WeaponInHand.Value, SightShift(), _config.LeftHandRoll.Value);
+                    _config.WeaponInHand.Value, SightShift(), _config.LeftHandRoll.Value,
+                    (_cameraRig.LeftEye.transform.position + _cameraRig.RightEye.transform.position) * 0.5f);
             }
         }
         catch (Exception exception)

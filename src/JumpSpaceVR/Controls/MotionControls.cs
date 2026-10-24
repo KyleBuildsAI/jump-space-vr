@@ -160,7 +160,7 @@ internal sealed class MotionControls
     /// </param>
     public void UpdatePose(Vector3 viewOrigin, Quaternion viewRotation, in TrackedPose hand, in TrackedPose pointer,
         in TrackedPose leftHand, in TrackedPose leftPointer, float leftGrip, float worldScale, Vector3 weaponOffset, bool moveWeapon,
-        Vector3 sightShift, float leftHandRoll)
+        Vector3 sightShift, float leftHandRoll, Vector3 head)
     {
         if (!IsActive || !pointer.IsValid)
         {
@@ -184,7 +184,7 @@ internal sealed class MotionControls
                     viewRotation * (leftPointer.IsValid ? leftPointer.Rotation : leftHand.Rotation))
                 : null;
             var rig = FindWeapon();
-            if (rig == null || !Arms.Update(rig, handPose, pointerRotation, left, leftGrip, weaponOffset, viewRotation, leftHandRoll))
+            if (rig == null || !Arms.Update(rig, handPose, pointerRotation, left, leftGrip, weaponOffset, viewRotation, leftHandRoll, head))
                 Arms.Idle();
             else
             {

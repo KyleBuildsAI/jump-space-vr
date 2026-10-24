@@ -36,6 +36,20 @@ expect rightHandErrorCm < 3
 expect leftHandErrorCm < 6
 snapshot
 
+# The body stands under the head, facing the body direction: leaning and aiming to the side don't sway it into view.
+expect bodyHeadCm < 2
+expect bodyYawError == 0 2
+head 0.15 1.55 0.25  45 0 0
+hand right 0.3 1.3 0.4  10 40 0
+wait 1.5
+expect bodyHeadCm < 2
+expect bodyYawError == 0 2
+expect rightHandErrorCm < 3
+snapshot
+head 0 1.6 0  20 0 0
+hand right 0.18 1.3 0.35  10 0 0
+wait 1
+
 # Two hands. The fore-end sits about 38 cm forward, 8 cm left and 5 cm up from the right grip: bringing the left hand
 # there highlights it, holding the left grip takes hold, and the gun then points from the right hand to the left.
 hand left 0.10 1.287 0.734  0 0 0
