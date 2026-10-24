@@ -18,6 +18,7 @@ CONTROLS
   Right trigger ........... fire        Left trigger ...... aim down sights
   Left stick .............. move        Right stick ....... snap turn (smooth turn in the menu)
   Grips ................... bumpers     A / B / X / Y ..... face buttons
+  Left grip at the gun's front (Weapon in hand on) ... hold the gun with both hands
   Left menu button ........ pause (hold 1 s to recenter your view)
   In menus ................ point at the screen and pull the trigger to click
 

@@ -1,0 +1,64 @@
+# Weapon in hand in the hangar: the gun moves to the right controller and the arms follow with IK (the body stays where
+# the game puts it); bringing the left hand to the fore-end and holding grip makes it a two-handed hold.
+
+waitfor vrRendering == 1 120
+# Default UI panel placement, so the laser lands on the same menu item whatever the player has set.
+config UiFollow Lazy
+config UiDistance 1.8
+config UiWidth 2.4
+head 0 1.6 0  0 0 0
+hand right 0 1.6 0  7.1 -25 0
+recenter
+key 0x0D
+wait 8
+keyuntil 0x1B 4 mainMenu == 1 90
+wait 3
+# "Enter Hangar", the second menu item.
+expect laserV == 0.39 0.012
+input right.trigger 1
+wait 0.3
+input right.trigger 0
+# The game asks to confirm entering the hangar before the prologue has been played; F confirms.
+wait 3
+key 0x46
+waitfor holdsItem == 1 360
+wait 20
+config WeaponInHand true
+recenter
+head 0 1.6 0  20 0 0
+# One hand: right hand in front, left hand down at the side.
+hand right 0.18 1.3 0.35  10 0 0
+hand left -0.25 1.0 0.1  0 0 0
+wait 2
+expect weaponInHand == 1
+expect twoHanded == 0
+expect rightHandErrorCm < 3
+expect leftHandErrorCm < 6
+snapshot
+
+# Two hands. The fore-end sits about 38 cm forward, 8 cm left and 5 cm up from the right grip: bringing the left hand
+# there highlights it, holding the left grip takes hold, and the gun then points from the right hand to the left.
+hand left 0.10 1.287 0.734  0 0 0
+wait 1
+expect canGrab == 1
+expect gripHighlight == 1
+input left.grip 1
+wait 1
+expect twoHanded == 1
+expect leftHandErrorCm < 3
+expect rightHandErrorCm < 3
+snapshot
+hand left 0.30 1.287 0.70  0 0 0
+wait 1
+expect twoHanded == 1
+expect barrelYaw > 8
+hand left -0.10 1.287 0.70  0 0 0
+wait 1
+expect barrelYaw < -8
+
+# Letting go returns to one hand: the gun points along the right controller again.
+input left.grip 0
+hand left -0.25 1.0 0.1  0 0 0
+wait 1
+expect twoHanded == 0
+expect barrelYaw == 0 3
