@@ -51,6 +51,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VrUi.PointerAssist _pointerAssist = new();
     private readonly Rendering.FirstPersonOverride _firstPerson = new();
     private readonly Tracking.ReferenceFrame _frame = new();
+    private readonly ShadowBudget _shadowBudget = new();
     private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
@@ -129,6 +130,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
         _frameRateCounter.Update(_config.ShowFrameRate.Value);
         _colorGrading.Apply(_runtime != null && _runtime.IsRendering ? _config.ColorPreset.Value : ColorPreset.Off);
+        _shadowBudget.Apply(_runtime != null && _runtime.IsRendering ? ShadowBudget.DistanceFor(_config.ShadowDistance.Value, _config.GraphicsQuality.Value) : 0f);
         // Render scale applies right away, whichever way it was changed (menu, settings file, test scenario).
         if (_runtime != null && _runtime.IsRendering && !Mathf.Approximately(XRSettings.eyeTextureResolutionScale, _config.ClampedRenderScale))
             XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
@@ -216,6 +218,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddChoice("VR graphics", _config.GraphicsQuality);
         _modMenu.AddChoice("DLSS (VR)", _config.Dlss);
         _modMenu.AddNumber("View distance", _config.ViewDistance, 0.25f, 0.5f, 4f, "0.00x");
+        _modMenu.AddNumber("Shadow distance (m, 0 = auto)", _config.ShadowDistance, 10f, 0f, 300f, "0");
         _modMenu.AddChoice("Colour grading", _config.ColorPreset);
         _modMenu.AddToggle("Stereo weapon", _config.StereoWeapon);
         _modMenu.AddChoice("VR runtime (F8 twice to apply)", _config.Runtime);
