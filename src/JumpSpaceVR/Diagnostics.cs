@@ -30,6 +30,9 @@ internal static partial class Diagnostics
         private int _next;
         private int _count;
 
+        /// <summary>Per-frame jumps beyond this (in the sampled unit, meters for eye height) are teleports.</summary>
+        public const float TeleportDistance = 0.5f;
+
         public RollingSamples(int size)
         {
             _values = new float[size];
@@ -46,7 +49,8 @@ internal static partial class Diagnostics
 
         /// <summary>
         /// Largest change in speed between consecutive frames (units per second). Steady climbs, slopes and uneven
-        /// frame times score low; bob, stair steps and shake score high.
+        /// frame times score low; bob, stair steps and shake score high. Jumps larger than
+        /// <see cref="TeleportDistance"/> in one frame (level loads, respawns, camera rig changes) are skipped.
         /// </summary>
         public float MaxSpeedChange
         {
@@ -62,7 +66,13 @@ internal static partial class Diagnostics
                     var elapsed = _times[current] - _times[previous];
                     if (elapsed <= 0f)
                         continue;
-                    var speed = (_values[current] - _values[previous]) / elapsed;
+                    var step = _values[current] - _values[previous];
+                    if (Mathf.Abs(step) > TeleportDistance)
+                    {
+                        previousSpeed = null;
+                        continue;
+                    }
+                    var speed = step / elapsed;
                     if (previousSpeed.HasValue)
                         worst = Mathf.Max(worst, Mathf.Abs(speed - previousSpeed.Value));
                     previousSpeed = speed;
