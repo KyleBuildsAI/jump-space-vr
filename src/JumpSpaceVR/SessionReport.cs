@@ -89,7 +89,7 @@ internal sealed class SessionReport
                     $"{100f * _slowFrames / _frames:F1}% frames under 45 fps, {_loadingPauses} loading pauses | controllers tracked {100f * _controllerFrames / _frames:F0}%, " +
                     $"input in {_inputFrames} frames, {_triggerPulls} trigger pulls, {_laserClicks} laser clicks | " +
                     $"in level {100f * _levelFrames / _frames:F0}%, weapon in hand {weaponShare:F0}% of level time, " +
-                    $"worst view jolt {_worstJolt:F0} cm/s");
+                    $"worst view jolt {_worstJolt:F0} cm/s | {FrameTimings.Describe()}");
         }
 
         _periodStart = Time.unscaledTime;

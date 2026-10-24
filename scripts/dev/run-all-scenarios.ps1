@@ -13,7 +13,7 @@ param(
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $summary = @()
 foreach ($file in Get-ChildItem (Join-Path $RepoRoot 'scenarios') -Filter "$Filter.txt" | Sort-Object Name) {
-    if ($file.BaseName -eq 'soak' -and -not $IncludeSoak) { continue }
+    if ($file.BaseName -in 'soak', 'perf-profile' -and -not $IncludeSoak) { continue }
     $output = & (Join-Path $PSScriptRoot 'run-scenario.ps1') -Scenario $file.FullName -GamePath $GamePath -TimeoutSeconds 1500
     $done = "$($output | Select-String -CaseSensitive '\[scenario\] DONE')" -replace '.*\[scenario\] ', ''
     $passed = $done -match 'failed=0$'
