@@ -1,0 +1,59 @@
+# Galaxy map in the hangar: the map is shown at its camera's angle (looking down at the table, not at the horizon) and
+# is steered with the sticks (it selects what is under its centre reticle), so motion aim steps aside there.
+waitfor vrRendering == 1 120
+# Default UI panel placement, so the laser lands on the same menu item whatever the player has set.
+config UiFollow Lazy
+config UiDistance 1.8
+config UiWidth 2.4
+head 0 1.6 0  0 0 0
+hand right 0 1.6 0  7.1 -25 0
+recenter
+key 0x0D
+wait 8
+keyuntil 0x1B 4 mainMenu == 1 90
+wait 3
+# "Enter Hangar", the second menu item.
+expect laserV == 0.39 0.012
+input right.trigger 1
+wait 0.3
+input right.trigger 0
+# The game asks to confirm entering the hangar before the prologue has been played; F confirms.
+wait 3
+key 0x46
+waitfor holdsItem == 1 360
+wait 20
+config WeaponInHand true
+recenter
+head 0 1.6 0  0 0 0
+hand right 0.1 1.5 0.3  0 0 0
+wait 3
+expect mapView == 0
+
+# Open the map (as if using its terminal): the view takes the map camera's downward angle.
+galaxymap
+wait 6
+expect mapView == 1
+expect viewPitch == -60 6
+snapshot
+
+# The map selects what is under its centre reticle and is steered with the sticks, like on a gamepad: motion aim
+# steps aside and the right stick reaches the game.
+expect motionActive == 0
+wait 3
+print cameraX cameraZ cameraYaw
+wait 2
+print cameraX cameraZ cameraYaw
+input right.stick 1 0
+wait 1.5
+input right.stick 0 0
+input left.stick 0 1
+wait 1.5
+input left.stick 0 0
+wait 1
+print cameraX cameraZ cameraYaw
+snapshot
+
+# Leaving the map returns to the normal level view.
+keyuntil 0x1B 3 mapView == 0 30
+wait 2
+expect viewPitch == 0 3

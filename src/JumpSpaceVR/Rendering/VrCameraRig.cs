@@ -127,7 +127,7 @@ internal sealed class VrCameraRig
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
         bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null, float viewDistance = 1f,
-        Vector3? positionOverride = null, Quaternion? frame = null)
+        Vector3? positionOverride = null, Quaternion? frame = null, bool fullRotation = false)
     {
         if (!EnsureCameras())
             return false;
@@ -146,7 +146,9 @@ internal sealed class VrCameraRig
         // With motion controls the body yaw is owned by the mod, so aiming the gun never turns the view.
         // "Level" is the character's floor (see ReferenceFrame), so a rolling ship doesn't spin the interior around you.
         var level = frame ?? Quaternion.identity;
-        var viewRotation = bodyYaw.HasValue
+        // Overview cameras (the galaxy map looks 60 degrees down at its table) are meant to be seen at their angle.
+        var viewRotation = fullRotation ? baseRotation
+            : bodyYaw.HasValue
             ? level * Quaternion.Euler(0f, bodyYaw.Value, 0f)
             : levelHorizon ? level * Quaternion.Euler(0f, Tracking.ReferenceFrame.YawIn(level, baseRotation), 0f) : baseRotation;
         ViewRotation = viewRotation;
