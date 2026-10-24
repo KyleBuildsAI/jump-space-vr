@@ -61,6 +61,27 @@ internal sealed class MotionControls
     /// <summary>Whether the rig's item locator was found (otherwise only the configured offset places it).</summary>
     public bool HasItemLocator { get; private set; }
 
+    /// <summary>Logs the first-person rig's transform hierarchy (bones, attach points) for mod development.</summary>
+    public string DescribeRigHierarchy()
+    {
+        var rig = FindWeapon();
+        if (rig == null)
+            return "no first-person rig";
+        var text = new System.Text.StringBuilder();
+        AppendHierarchy(text, rig, 0);
+        return text.ToString();
+    }
+
+    private static void AppendHierarchy(System.Text.StringBuilder text, Transform node, int depth)
+    {
+        if (depth > 24)
+            return;
+        text.Append(' ', depth * 2).Append(node.name)
+            .Append($" local=({node.localPosition.x:F3},{node.localPosition.y:F3},{node.localPosition.z:F3})").AppendLine();
+        for (var index = 0; index < node.childCount; index++)
+            AppendHierarchy(text, node.GetChild(index), depth + 1);
+    }
+
     /// <summary>True when the player's first-person rig holds an item (a gun in the hangar or a mission).</summary>
     public bool HoldsItem
     {
@@ -134,11 +155,12 @@ internal sealed class MotionControls
     /// line the sights up with one eye instead of the point between the eyes).
     /// </param>
     public void UpdatePose(Vector3 viewOrigin, Quaternion viewRotation, in TrackedPose hand, in TrackedPose pointer,
-        float worldScale, Vector3 weaponOffset, bool moveWeapon, Vector3 sightShift)
+        in TrackedPose leftHand, float leftGrip, float worldScale, Vector3 weaponOffset, bool moveWeapon, Vector3 sightShift)
     {
         if (!IsActive || !pointer.IsValid)
         {
             _hasAimTarget = false;
+            Arms.Idle();
             RestoreWeapon();
             return;
         }
@@ -149,11 +171,32 @@ internal sealed class MotionControls
         _hasAimTarget = true;
 
         if (moveWeapon && hand.IsValid)
-            PlaceWeapon(viewOrigin + viewRotation * ((hand.Position + DebugHandOffset) * worldScale), pointerRotation, weaponOffset);
-        else if (sightShift.sqrMagnitude > 1e-8f)
-            ShiftWeapon(sightShift);
+        {
+            var handPose = new HandPose(viewOrigin + viewRotation * ((hand.Position + DebugHandOffset) * worldScale), pointerRotation);
+            HandPose? left = leftHand.IsValid
+                ? new HandPose(viewOrigin + viewRotation * (leftHand.Position * worldScale), viewRotation * leftHand.Rotation)
+                : null;
+            var rig = FindWeapon();
+            if (rig == null || !Arms.Update(rig, handPose, pointerRotation, left, leftGrip, weaponOffset, viewRotation))
+                Arms.Idle();
+            else
+            {
+                _weaponPlacedFrame = Time.frameCount;
+                HasItemLocator = true;
+                LastGripError = Arms.RightHandError;
+                // With two hands the gun no longer points along the right controller: aim where the barrel points.
+                if (Arms.TwoHanded && Arms.Barrel.HasValue)
+                    _aimTarget = Arms.Barrel.Value.origin + Arms.Barrel.Value.direction * AimConvergenceDistance;
+            }
+        }
         else
-            RestoreWeapon();
+        {
+            Arms.Idle();
+            if (sightShift.sqrMagnitude > 1e-8f)
+                ShiftWeapon(sightShift);
+            else
+                RestoreWeapon();
+        }
     }
 
     private void ShiftWeapon(Vector3 worldShift)
@@ -172,9 +215,13 @@ internal sealed class MotionControls
         _weaponMoved = true;
     }
 
+    /// <summary>Weapon and arm placement while "Weapon in hand" is on.</summary>
+    public VrArms Arms { get; } = new();
+
     /// <summary>Puts the first-person weapon back where the game placed it (start of frame, before gameplay).</summary>
     public void RestoreWeapon()
     {
+        Arms.Restore();
         if (!_weaponMoved)
             return;
         _weaponMoved = false;
@@ -185,38 +232,6 @@ internal sealed class MotionControls
             _weapon.localPosition = _weaponBaseLocalPosition;
             _weapon.localRotation = _weaponBaseLocalRotation;
         }
-    }
-
-    /// <summary>
-    /// The first-person rig is authored around the camera: its root sits at the eye with the gun held in front.
-    /// Placing that root so the gun's grip lands on the controller (offset = grip position in rig space) puts the
-    /// weapon in your hand, pointing along the controller.
-    /// </summary>
-    private void PlaceWeapon(Vector3 handPosition, Quaternion aimRotation, Vector3 gripOffsetInRig)
-    {
-        var weapon = FindWeapon();
-        if (weapon == null)
-            return;
-
-        if (!_weaponMoved)
-        {
-            _weaponBaseLocalPosition = weapon.localPosition;
-            _weaponBaseLocalRotation = weapon.localRotation;
-        }
-
-        // The rig's item locator is where held items sit; landing it on the controller grip puts the weapon in
-        // the hand. The configured offset fine-tunes on top of that (or replaces it if the rig has no locator).
-        var gripInRig = gripOffsetInRig;
-        var locator = FindItemLocator(weapon);
-        if (locator != null)
-            gripInRig += weapon.InverseTransformPoint(locator.position);
-        weapon.SetPositionAndRotation(handPosition - aimRotation * gripInRig, aimRotation);
-        HasItemLocator = locator != null;
-        _weaponPlacedFrame = Time.frameCount;
-        LastGripError = locator != null ? Vector3.Distance(locator.position, handPosition + aimRotation * gripOffsetInRig) : 0f;
-        _weaponAppliedLocalPosition = weapon.localPosition;
-        _weaponAppliedLocalRotation = weapon.localRotation;
-        _weaponMoved = true;
     }
 
     private Transform _locator;

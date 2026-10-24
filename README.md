@@ -95,6 +95,7 @@ Controller layout with motion controls on (default):
 | Left stick | Move (relative to your body) |
 | Right stick left/right | Snap or smooth turn |
 | Grips | Bumpers (LB / RB) |
+| Left grip near the gun's fore-end | With "Weapon in hand" on: hold to grab the gun with both hands (the grip point glows blue when your hand is close); release to let go |
 | A / B / X / Y | Face buttons |
 
 ## Settings
@@ -140,9 +141,10 @@ launch with the mod.
 - **Markers over objects and players.** These are drawn in screen space, so they sit on the UI panel and don't
   line up exactly with the 3D objects they label. Unity renders all overlay canvases in one pass, which rules out
   splitting the markers from the HUD cheaply. The panel follow modes and size settings help with readability.
-- **Weapon in hand needs tuning per weapon.** The weapon is attached at the game's item attach point; use the
-  weapon offset sliders in the mod menu (Insert) if the grip sits wrong. Turn "Weapon in hand" off to keep the
-  game's own weapon placement.
+- **Weapon in hand.** The gun moves to your right controller and the first-person arms bend to follow (the body
+  stays where the game puts it; arms stretch a little when your hand is further away than the character's arm).
+  It only applies while you hold an item (the hangar and missions, not the prologue opening). If the grip sits
+  wrong, use the weapon offset sliders in the mod menu; turn "Weapon in hand" off to keep the game's own placement.
 - **Room-scale movement.** By default, walking around your room moves your view but not your character. Turn on
   "Room-scale walking" in the mod menu (experimental) to make the character follow your physical steps.
 - **Performance.** Each eye is a full HDRP render. If gameplay feels juddery, lower "Render scale" in the mod menu.
@@ -224,6 +226,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits "Play Prologue"; a trigger click loads the prologue |
 | `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick; the trigger fires; at least 45 fps |
 | `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
+| `weapon-in-hand.txt` (~2 min) | In the hangar: gun on the right controller, arms follow (hand error under 3 cm), grab the fore-end with the left hand, steer the gun with both hands, let go |
 | `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu; left stick navigates, A toggles a setting, B closes |
 | `vr-toggle.txt` (~1 min) | F8 turns VR off and on three times; the session restarts cleanly and hands, laser and weapon fix work afterwards |
 | `hangar-options.txt` (~2 min) | Enters the hangar (gun in hand): gun drawn by the eye cameras, sights move to the right eye while aiming, view distance, frame-rate counter |

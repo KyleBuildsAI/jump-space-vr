@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.5.0", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.6.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -256,6 +256,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             state.RightTrigger = 0f;
         }
 
+        // The left grip grabs the weapon's fore-end; don't also press the game's shoulder button with it.
+        if (_motion.Arms.TwoHanded || _motion.Arms.CanGrab)
+            state.LeftGrip = 0f;
+
         if (_config.RoomscaleWalking.Value && _config.PositionalTracking.Value && !_modMenu.IsOpen)
             state.LeftStick = _roomscale.AddWalkInput(state.LeftStick, _headTracker.LocalPosition);
 
@@ -309,6 +313,17 @@ public sealed class JumpSpaceVrMod : MelonMod
             "aimYawOffset" => cameraYaw.HasValue ? Mathf.DeltaAngle(_motion.Body.Yaw, cameraYaw.Value) : null,
             "motionActive" => _motion.IsActive ? 1f : 0f,
             "letterboxVisible" => IsLetterboxVisible() ? 1f : 0f,
+            "gripSpanX" => _motion.Arms.GripSpan.x,
+            "gripSpanY" => _motion.Arms.GripSpan.y,
+            "gripSpanZ" => _motion.Arms.GripSpan.z,
+            "barrelYaw" => _motion.Arms.Barrel.HasValue
+                ? Mathf.DeltaAngle(_cameraRig.ViewRotation.eulerAngles.y, Quaternion.LookRotation(_motion.Arms.Barrel.Value.direction).eulerAngles.y)
+                : null,
+            "gripHighlight" => GameObject.Find("JumpSpaceVR_GripHighlight") != null ? 1f : 0f,
+            "twoHanded" => _motion.Arms.TwoHanded ? 1f : 0f,
+            "canGrab" => _motion.Arms.CanGrab ? 1f : 0f,
+            "rightHandErrorCm" => _motion.Arms.RightHandError * 100f,
+            "leftHandErrorCm" => _motion.Arms.LeftHandError * 100f,
             "holdsItem" => _motion.HoldsItem ? 1f : 0f,
             "weaponInHand" => _motion.WeaponInHand ? 1f : 0f,
             "itemLocator" => _motion.HasItemLocator ? 1f : 0f,
@@ -380,6 +395,9 @@ public sealed class JumpSpaceVrMod : MelonMod
                 break;
             case "recenter":
                 _recenterPending = true;
+                break;
+            case "rig":
+                Log.Msg("First-person rig hierarchy:" + Environment.NewLine + _motion.DescribeRigHierarchy());
                 break;
             case "restore-config":
                 _config.RestoreTemporary();
@@ -727,6 +745,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                 UpdateLaserPointer(laserPointer);
                 _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
                     _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
+                    _headTracker.Localize(controllers.LeftHand, positional), _rawControllerState.LeftGrip,
                     _config.WorldScale.Value,
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
                     _config.WeaponInHand.Value, SightShift());

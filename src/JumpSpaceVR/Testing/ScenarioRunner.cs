@@ -169,6 +169,7 @@ internal sealed class ScenarioRunner
                 case "config":
                     _command($"config {parts[1]} {parts[2]}");
                     break;
+                case "rig":
                 case "snapshot":
                 case "diagnostics":
                 case "recenter":
