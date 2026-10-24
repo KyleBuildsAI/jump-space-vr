@@ -52,6 +52,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly Rendering.FirstPersonOverride _firstPerson = new();
     private readonly Tracking.ReferenceFrame _frame = new();
     private readonly ShadowBudget _shadowBudget = new();
+    private readonly ComfortVignette _vignette = new();
     private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
@@ -198,6 +199,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
         _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
+        _modMenu.AddChoice("Comfort vignette", _config.ComfortVignette);
         _modMenu.AddToggle("Always first person", _config.ForceFirstPerson);
         _modMenu.EndPage();
 
@@ -431,6 +433,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "handFramesReceived" => _handSync.FramesReceived,
             "firstPersonOverride" => _firstPerson.Active ? 1f : 0f,
             "mapView" => _mapView ? 1f : 0f,
+            "vignette" => _vignette.Intensity,
             "planarProbes" => UnityEngine.Object.FindObjectsByType<UnityEngine.Rendering.HighDefinition.PlanarReflectionProbe>(FindObjectsSortMode.None).Length,
             "realtimeProbes" => CountRealtimeProbes(),
             "cameraX" => camera != null ? camera.transform.position.x : null,
@@ -926,6 +929,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _motion.Deactivate();
         _handSync.Reset();
         _firstPerson.Release();
+        _vignette.Clear();
         FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
         _uiCompositor.Stop();
@@ -1015,6 +1019,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
                 _headAudio.UpdateHeadPose(_cameraRig.LeftEye, _cameraRig.RightEye);
+                _vignette.Update(_config.ComfortVignette.Value, _cameraRig.GamePosition, _cameraRig.ViewRotation);
                 _eyeHeights.Add(_cameraRig.LeftEye.transform.position.y, Time.unscaledTime);
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;

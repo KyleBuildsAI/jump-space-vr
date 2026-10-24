@@ -53,6 +53,8 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
   turns on "Multiplayer hands (co-op)" under Weapon and hands; players without the mod see the normal game.
 - **Galaxy map in VR.** The map is shown at its camera's angle, looking down at the table, and the sticks steer it as
   on a gamepad (it selects what is under its centre reticle).
+- **Comfort vignette (optional).** The edges of the view darken while the stick moves or turns you, never for your
+  own head movement. Off by default; Low, Medium or High under View and comfort.
 - **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
   chair), your view stays in your character's head.
 - **Mod menu (Insert).** An in-headset settings menu, grouped into pages so everything fits: View and comfort, UI and
@@ -175,6 +177,7 @@ launch with the mod.
 | `ShowCrosshair` | `false` | Show the game's crosshair on the UI panel (it doesn't line up with a gun aimed by hand). |
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
+| `ComfortVignette` | `Off` | Darken the edges of the view while the stick moves or turns you: `Off`, `Low`, `Medium`, `High`. |
 | `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
 | `ShareHands` | `false` | Co-op (beta): send your VR hands to other modded players and show theirs (the host needs the mod with this on). |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
@@ -300,6 +303,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
 | `hand-sync.txt` (~2 min) | In the hangar: with the loopback option our shared hands go through the network format onto our own third-person arms (hand error under 6 cm), with and without weapon in hand; off shows nothing |
 | `galaxy-map.txt` (~2 min) | In the hangar: the galaxy map is shown at its camera's 60-degree downward angle; motion aim steps aside so the sticks steer the map; leaving restores the normal view |
+| `comfort-vignette.txt` (~2 min) | In the hangar: walking and smooth turning darken the view's edges, standing still and head movement don't, Off never does |
 | `first-person.txt` (~2 min) | In the hangar: normal first-person play never triggers the third-person override; "level" is the world there |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
