@@ -64,6 +64,17 @@ Set-RuntimeOverride $runtimeJson (-not $RealRuntime)
 
 $launchTime = Get-Date
 Start-Process 'steam://rungameid/1757300'
+
+# Wait until the mod has loaded (it reads its settings then) before anything puts the user's settings back; Steam can
+# take a while to start the game, and a fixed delay raced with it.
+$modLog = Join-Path $GamePath 'MelonLoader\Latest.log'
+$loadDeadline = (Get-Date).AddSeconds(180)
+while ((Get-Date) -lt $loadDeadline) {
+    $logFile = Get-Item $modLog -ErrorAction SilentlyContinue
+    if ($logFile -and $logFile.LastWriteTime -gt $launchTime -and
+        (Select-String -Path $modLog -Pattern '\[JumpSpaceVR\] Loaded' -Quiet)) { break }
+    Start-Sleep -Seconds 1
+}
 Start-Sleep -Seconds $Seconds
 
 $running = [bool](Get-Process -Name 'Jump Space' -ErrorAction SilentlyContinue)

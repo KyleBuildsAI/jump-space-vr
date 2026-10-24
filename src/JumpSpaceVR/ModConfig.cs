@@ -34,7 +34,14 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> ShowCrosshair { get; }
     public MelonPreferences_Entry<bool> CurvedUi { get; }
+    public MelonPreferences_Entry<float> HelmetUiWidth { get; }
+    public MelonPreferences_Entry<float> LeftHandRoll { get; }
+    public MelonPreferences_Entry<bool> HeadTrackedAudio { get; }
+    public MelonPreferences_Entry<bool> Haptics { get; }
+    public MelonPreferences_Entry<Rendering.ColorPreset> ColorPreset { get; }
+    public MelonPreferences_Entry<float> HapticStrength { get; }
     public MelonPreferences_Entry<Rendering.DlssMode> Dlss { get; }
+    public MelonPreferences_Entry<Rendering.VrGraphicsQuality> GraphicsQuality { get; }
     public MelonPreferences_Entry<bool> MotionControls { get; }
     public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
     public MelonPreferences_Entry<float> SnapTurnAngle { get; }
@@ -109,8 +116,21 @@ internal sealed class ModConfig
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
         ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
             "Multiplies how far the game draws (far clip plane and level of detail). Higher costs frame rate.");
+        GraphicsQuality = _category.CreateEntry("GraphicsQuality", Rendering.VrGraphicsQuality.Game, "VR graphics",
+            "Game keeps the game's settings; High, Medium and Low switch off progressively more expensive effects for both eyes.");
         Dlss = _category.CreateEntry("Dlss", Rendering.DlssMode.Game, "DLSS (VR)",
             "NVIDIA DLSS for both eyes: Game follows the game's graphics settings; Quality/Balanced/Performance force it on.");
+        HelmetUiWidth = _category.CreateEntry("HelmetUiWidth", 1.3f, "Helmet HUD size (m)",
+            "Width of the Helmet display (it sits 0.9 m in front of your eyes).");
+        LeftHandRoll = _category.CreateEntry("LeftHandRoll", 90f, "Left hand roll (degrees)",
+            "Turns the free left hand around your controller's pointing direction, for a natural rest pose.");
+        ColorPreset = _category.CreateEntry("ColorPreset", Rendering.ColorPreset.Off, "Colour grading",
+            "Colour grading preset on top of the game's look: Off, Vivid, Cinematic, ColdSpace, Warm, Bright, Noir.");
+        Haptics = _category.CreateEntry("Haptics", true, "Controller vibration",
+            "Vibrate the controllers when firing, grabbing the gun with both hands and clicking menus.");
+        HapticStrength = _category.CreateEntry("HapticStrength", 0.7f, "Vibration strength", "0 to 1.");
+        HeadTrackedAudio = _category.CreateEntry("HeadTrackedAudio", true, "Head-tracked audio",
+            "Sound follows your head: turning your head turns what you hear (the game's listener otherwise follows its camera).");
         CurvedUi = _category.CreateEntry("CurvedUi", false, "Curved UI",
             "Bend the UI panel around you (easier to read at the edges). The Helmet follow mode is always curved.");
         ShowCrosshair = _category.CreateEntry("ShowCrosshair", false, "Show crosshair",

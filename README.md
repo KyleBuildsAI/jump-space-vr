@@ -34,6 +34,8 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
   display: the HUD sits on your visor (head-locked, wide and curved, slightly lagging like a helmet HUD).
 - **Two-handed guns.** With "Weapon in hand" on, bring your left hand to the gun's fore-end (two blue rings show
   where) and hold grip to steady and aim the gun with both hands.
+- **Feel.** Head-tracked game audio, controller vibration, colour grading presets.
+- **Performance controls.** VR graphics levels and a one-click preset for mid-range cards.
 - **DLSS in VR.** The game's built-in NVIDIA DLSS can be forced on for both eyes, for sharper edges or more frame
   rate at high render scales.
 - **Comfort.**
@@ -121,6 +123,12 @@ launch with the mod.
 | `AimEye` | `Right` | While aiming down sights (left trigger), line the sights up with this eye: `Right`, `Left` or `Center`. |
 | `ViewDistance` | `1.0` | Draw distance multiplier (level of detail and far clip), 0.5–4. Higher costs frame rate. |
 | `ShowFrameRate` | `false` | Show the frame rate in the top-left of the UI panel. |
+| `GraphicsQuality` | `Game` | VR graphics: `Game` keeps the game's settings; `High` drops motion blur, depth of field and lens effects; `Medium` also SSR/SSGI, contact shadows, volumetric clouds; `Low` also volumetric fog, ambient occlusion, refraction. The menu also has **Preset: slower graphics card** (Low, DLSS Performance, render scale 1.0, view distance 0.75). |
+| `ColorPreset` | `Off` | Colour grading on top of the game's look: `Vivid`, `Cinematic`, `ColdSpace`, `Warm`, `Bright`, `Noir`. |
+| `Haptics` / `HapticStrength` | `true` / `0.7` | Controller vibration when firing (both hands when holding the gun two-handed), grabbing the fore-end and clicking menus. |
+| `HeadTrackedAudio` | `true` | Sound follows your head instead of the game camera. |
+| `HelmetUiWidth` | `1.3` | Width of the Helmet display (m). |
+| `LeftHandRoll` | `90` | Turns the free left hand for a natural rest pose (try -90 if it looks backwards). |
 | `Dlss` | `Game` | NVIDIA DLSS for both eyes: `Game` follows the game's graphics option; `Off`, `Quality`, `Balanced`, `Performance`, `UltraPerformance` force it. At high render scales `Performance` gave about +20% frame rate in testing. |
 | `CurvedUi` | `false` | Bend the UI panel around you. |
 | `ShowCrosshair` | `false` | Show the game's crosshair on the UI panel (it doesn't line up with a gun aimed by hand). |
@@ -140,7 +148,9 @@ launch with the mod.
 - **Session report.** While VR runs, the mod writes a `[session]` line to `MelonLoader/Latest.log` every 5 minutes
   and when VR stops or the game closes: frame rate, worst frame, how much of the time controllers were tracked,
   trigger pulls and laser clicks, whether the weapon sat in your hand, and the worst view jolt. Include it in reports.
-- **Low frame rate.** Lower `RenderScale`. Each eye is a full HDRP render, so expect roughly twice the GPU cost of
+- **Low frame rate.** In the mod menu, use **Preset: slower graphics card**, or lower `RenderScale`, set `VR graphics`
+  to Medium/Low and DLSS to Performance. In SteamVR / Steam Link, a 72 or 90 Hz refresh rate is easier to hold than
+  120 Hz. Lower `RenderScale`. Each eye is a full HDRP render, so expect roughly twice the GPU cost of
   flat play.
 - **Anything else.** Run `scripts\uninstall.ps1 -GamePath "<game folder>"`, then use Steam's *Verify integrity of
   game files* to return to the unmodded game.
@@ -241,6 +251,8 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `hangar-options.txt` (~2 min) | Enters the hangar (gun in hand): gun drawn by the eye cameras, sights move to the right eye while aiming, view distance, frame-rate counter |
 | `ui-modes.txt` (~1 min) | Curved panel still takes laser clicks; the helmet display follows the head |
 | `dlss.txt` (~2 min) | DLSS runs on both eye cameras when forced on (prints frame rate off / Quality / Performance at render scale 2) |
+| `feel-and-look.txt` (~2 min) | In the hangar: head-tracked audio updates, vibration on firing and grabbing, colour grading on/off |
+| `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,

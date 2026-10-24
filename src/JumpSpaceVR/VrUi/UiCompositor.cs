@@ -115,6 +115,9 @@ internal sealed class UiCompositor
     private object _coroutine;
 
     public bool PanelEnabled { get; set; } = true;
+
+    /// <summary>The panel's yaw relative to the body (degrees), for tests.</summary>
+    public float PanelYaw => Mathf.DeltaAngle(0f, _panelRotation.eulerAngles.y);
     public RenderTexture UiTexture => _uiTexture;
     public RenderTexture MirrorSource { get; set; }
 
@@ -133,13 +136,14 @@ internal sealed class UiCompositor
     /// panel travels with the player's body; the mode decides how it follows the head.
     /// </summary>
     public void PlacePanel(Vector3 viewOrigin, Quaternion viewRotation, Vector3 headPosition, Quaternion headRotation,
-        UiFollowMode mode, float smoothingSeconds, float distance, float width, bool snapToHead, bool curved)
+        UiFollowMode mode, float smoothingSeconds, float distance, float width, bool snapToHead, bool curved,
+        float helmetWidth)
     {
         if (mode == UiFollowMode.Helmet)
         {
             // Visor display: always in front of the eyes, lagging a little so it feels mounted in the helmet.
             distance = HelmetDistance;
-            width = HelmetWidth;
+            width = helmetWidth;
             smoothingSeconds = HelmetLagSeconds;
             curved = true;
         }
@@ -196,7 +200,6 @@ internal sealed class UiCompositor
 
     // Helmet display: about the closest distance that stays comfortable to focus on in a headset.
     private const float HelmetDistance = 0.9f;
-    private const float HelmetWidth = 1.5f;
     private const float HelmetLagSeconds = 0.04f;
 
     /// <summary>Frame-rate independent exponential smoothing factor.</summary>

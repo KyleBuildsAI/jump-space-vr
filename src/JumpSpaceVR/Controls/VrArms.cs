@@ -111,7 +111,7 @@ internal sealed class VrArms
     /// aim pose); <paramref name="leftGrip"/> is the left controller's grip value.
     /// </summary>
     public bool Update(Transform rig, HandPose rightHand, Quaternion rightAim, HandPose? leftHand, float leftGrip, Vector3 gripOffset,
-        Quaternion bodyRotation)
+        Quaternion bodyRotation, float leftHandRoll)
     {
         // Only while something is held (in the prologue the arms are animated without an item; leave them alone).
         if (!Bind(rig) || _locator.childCount == 0)
@@ -159,7 +159,8 @@ internal sealed class VrArms
         // were the gun's fore-end, so it follows the wrist instead of staying in the animated (upside-down) pose.
         var leftTarget = leftOnWeapon
             ? Absolute(placed, leftInWeapon)
-            : new HandPose(leftHand.Value.position, leftHand.Value.rotation * leftInWeapon.rotation);
+            : new HandPose(leftHand.Value.position,
+                leftHand.Value.rotation * Quaternion.AngleAxis(leftHandRoll, Vector3.forward) * leftInWeapon.rotation);
         SolveArm(_leftArm, leftTarget, bodyRotation, -1f);
         LeftHandError = Vector3.Distance(_leftArm.Hand.position, leftTarget.position);
 

@@ -26,6 +26,8 @@ CONTROLS
   F7 ... recenter     F8 ... VR on/off     F9 ... diagnostics     F10 ... save what the headset sees
 
 PROBLEMS?
+  - Choppy on a mid-range card (RTX 3060/4060/5060)? Insert menu > "Preset: slower graphics card",
+    and set Steam Link / SteamVR to 72 or 90 Hz.
   - Reporting a problem: press F10 and F9 in game, then send MelonLoader\Latest.log (it includes a
     [session] summary of frame rate and controller input every 5 minutes).
   - Game stays flat: start SteamVR / Virtual Desktop / Quest Link and wait 10 seconds.

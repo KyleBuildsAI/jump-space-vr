@@ -60,6 +60,12 @@ internal sealed class VrCameraRig
 
     /// <summary>DLSS for both eyes, applied when the eyes are placed each frame.</summary>
     public DlssMode Dlss { get; set; } = DlssMode.Game;
+
+    /// <summary>Rendering features for both eyes (frame settings), applied when it or the camera changes.</summary>
+    public VrGraphicsQuality Quality { get; set; } = VrGraphicsQuality.Game;
+    private readonly GraphicsQuality _graphicsQuality = new();
+    private VrGraphicsQuality _appliedQuality = VrGraphicsQuality.Game;
+    private HDAdditionalCameraData _appliedQualityData;
     private DlssMode _appliedDlss = DlssMode.Game;
     private HDAdditionalCameraData _appliedDlssData;
     private HDAdditionalCameraData _appliedDlssRightData;
@@ -344,6 +350,17 @@ internal sealed class VrCameraRig
         _camera.allowDynamicResolution = enabled;
     }
 
+    private void ApplyQuality()
+    {
+        if (_sourceData == null || (Quality == _appliedQuality && _sourceData == _appliedQualityData))
+            return;
+        _graphicsQuality.Apply(_sourceData, Quality);
+        _graphicsQuality.Apply(_rightEyeData, Quality);
+        _appliedQuality = Quality;
+        _appliedQualityData = _sourceData;
+        Log.Msg($"VR graphics quality: {Quality}.");
+    }
+
     private void SyncRightEyeSettings()
     {
         if (_sourceData != null && _rightEyeData != null && --_framesUntilSettingsSync <= 0)
@@ -353,6 +370,7 @@ internal sealed class VrCameraRig
         }
 
         ApplyDlss();
+        ApplyQuality();
         _rightEye.allowDynamicResolution = _camera.allowDynamicResolution;
         _rightEye.cullingMask = _camera.cullingMask;
         _rightEye.nearClipPlane = _camera.nearClipPlane;
