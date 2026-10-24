@@ -253,7 +253,7 @@ internal static partial class Diagnostics
         if (hdData != null)
         {
             names.Append($"| volumeMask=0x{hdData.volumeLayerMask.value:X8} anchor={(hdData.volumeAnchorOverride != null ? hdData.volumeAnchorOverride.name : "-")} " +
-                         $"aa={hdData.antialiasing} customFrameSettings={hdData.customRenderingSettings} dynRes={hdData.allowDynamicResolution}");
+                         $"aa={hdData.antialiasing} dlss={hdData.allowDeepLearningSuperSampling}/{hdData.cameraCanRenderDLSS} customFrameSettings={hdData.customRenderingSettings} dynRes={hdData.allowDynamicResolution}");
         }
         return names.ToString();
     }

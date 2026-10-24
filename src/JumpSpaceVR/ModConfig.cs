@@ -33,6 +33,8 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<float> ViewDistance { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> ShowCrosshair { get; }
+    public MelonPreferences_Entry<bool> CurvedUi { get; }
+    public MelonPreferences_Entry<Rendering.DlssMode> Dlss { get; }
     public MelonPreferences_Entry<bool> MotionControls { get; }
     public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
     public MelonPreferences_Entry<float> SnapTurnAngle { get; }
@@ -107,6 +109,10 @@ internal sealed class ModConfig
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
         ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
             "Multiplies how far the game draws (far clip plane and level of detail). Higher costs frame rate.");
+        Dlss = _category.CreateEntry("Dlss", Rendering.DlssMode.Game, "DLSS (VR)",
+            "NVIDIA DLSS for both eyes: Game follows the game's graphics settings; Quality/Balanced/Performance force it on.");
+        CurvedUi = _category.CreateEntry("CurvedUi", false, "Curved UI",
+            "Bend the UI panel around you (easier to read at the edges). The Helmet follow mode is always curved.");
         ShowCrosshair = _category.CreateEntry("ShowCrosshair", false, "Show crosshair",
             "Show the game's crosshair on the VR UI panel (it doesn't line up with a gun aimed by hand).");
         ShowFrameRate = _category.CreateEntry("ShowFrameRate", false, "Show frame rate",

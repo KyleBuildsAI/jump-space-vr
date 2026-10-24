@@ -108,6 +108,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         _motion.RestoreWeapon();
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
         _frameRateCounter.Update(_config.ShowFrameRate.Value);
+        // Render scale applies right away, whichever way it was changed (menu, settings file, test scenario).
+        if (_runtime != null && _runtime.IsRendering && !Mathf.Approximately(XRSettings.eyeTextureResolutionScale, _config.ClampedRenderScale))
+            XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
         _crosshairHider.Update(_runtime != null && _runtime.IsRendering && !_config.ShowCrosshair.Value);
         ApplyLodDistance(_runtime != null && _runtime.IsRendering ? _config.ClampedViewDistance : 1f);
         // After the restore, so scenario checks see the game's own camera rather than the headset view.
@@ -152,6 +155,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private void BuildModMenu()
     {
         _modMenu.AddChoice("UI follow mode", _config.UiFollow, _ => _snapPanelToHead = true);
+        _modMenu.AddToggle("Curved UI", _config.CurvedUi);
         _modMenu.AddNumber("UI smoothing (s)", _config.UiSmoothing, 0.02f, 0f, 1f, "0.00");
         _modMenu.AddNumber("UI size (m)", _config.UiWidth, 0.1f, 0.6f, 6f, "0.0");
         _modMenu.AddNumber("UI distance (m)", _config.UiDistance, 0.1f, 0.5f, 5f, "0.0");
@@ -165,8 +169,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Show frame rate", _config.ShowFrameRate);
         _modMenu.AddToggle("Show crosshair", _config.ShowCrosshair);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
-        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 3f, "0.0",
-            value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 3f));
+        _modMenu.AddChoice("DLSS (VR)", _config.Dlss);
+        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 3f, "0.0");
         _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
         _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
         _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
@@ -306,6 +310,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         return name switch
         {
             "fps" => Diagnostics.AverageFps,
+            "eyeWidth" => XRSettings.eyeTextureWidth,
+            "dlssRunning" => _cameraRig.DlssRunning ? 1f : 0f,
             "eyeFarClip" => _cameraRig.RightEye != null ? _cameraRig.RightEye.farClipPlane : null,
             "lodBias" => QualitySettings.lodBias,
             "sightShiftCm" => _lastSightShift.magnitude * 100f,
@@ -737,6 +743,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             }
             float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
 
+            _cameraRig.Dlss = _config.Dlss.Value;
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
                     _config.ClampedViewDistance))
@@ -748,7 +755,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;
                 _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.ViewRotation, headPosition, left.Rotation,
                     _config.UiFollow.Value, _config.UiSmoothing.Value, _config.UiDistance.Value, _config.UiWidth.Value,
-                    _snapPanelToHead);
+                    _snapPanelToHead, _config.CurvedUi.Value);
                 _snapPanelToHead = false;
                 var roomscaleStep = _roomscale.ConsumeCharacterStep(_cameraRig.GamePosition, _cameraRig.ViewRotation);
                 if (roomscaleStep != Vector3.zero)

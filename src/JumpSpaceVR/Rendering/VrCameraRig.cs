@@ -5,6 +5,18 @@ using UnityEngine.XR;
 
 namespace JumpSpaceVR.Rendering;
 
+/// <summary>NVIDIA DLSS on the eye cameras (HDRP's built-in DLSS, which the game ships).</summary>
+internal enum DlssMode
+{
+    /// <summary>Whatever the game's own graphics settings choose (both eyes kept the same).</summary>
+    Game,
+    Off,
+    Quality,
+    Balanced,
+    Performance,
+    UltraPerformance,
+}
+
 /// <summary>
 /// Turns the game's gameplay camera into a stereo pair.
 ///
@@ -45,6 +57,15 @@ internal sealed class VrCameraRig
     private Quaternion _appliedLocalRotation;
 
     public Camera LeftEye => _camera;
+
+    /// <summary>DLSS for both eyes, applied when the eyes are placed each frame.</summary>
+    public DlssMode Dlss { get; set; } = DlssMode.Game;
+    private DlssMode _appliedDlss = DlssMode.Game;
+    private HDAdditionalCameraData _appliedDlssData;
+    private HDAdditionalCameraData _appliedDlssRightData;
+
+    /// <summary>True when HDRP reports it can run DLSS for the left eye camera this frame.</summary>
+    public bool DlssRunning => _sourceData != null && _sourceData.cameraCanRenderDLSS;
 
     /// <summary>Raised when the rig switches to a new game camera (level load, ship, cutscene).</summary>
     public event System.Action CameraChanged;
@@ -287,6 +308,42 @@ internal sealed class VrCameraRig
     /// The game changes clip planes, culling, volume masks and anti-aliasing on its camera at runtime
     /// (menus, ship view, settings), so the right eye is kept in sync with the left.
     /// </summary>
+    /// <summary>
+    /// Forces DLSS on (or off) for both eye cameras. DLSS renders at a lower internal resolution and reconstructs a
+    /// sharp image, which is the main way to win back frame rate with two full HDRP renders per frame.
+    /// </summary>
+    private void ApplyDlss()
+    {
+        if (Dlss == DlssMode.Game || _sourceData == null)
+            return;
+        // Only touch the cameras when something changed: rewriting DLSS settings makes HDRP rebuild its DLSS state.
+        if (Dlss == _appliedDlss && _sourceData == _appliedDlssData && _rightEyeData == _appliedDlssRightData)
+            return;
+        _appliedDlss = Dlss;
+        _appliedDlssData = _sourceData;
+        _appliedDlssRightData = _rightEyeData;
+        var enabled = Dlss != DlssMode.Off;
+        foreach (var data in new[] { _sourceData, _rightEyeData })
+        {
+            if (data == null)
+                continue;
+            data.allowDynamicResolution = enabled;
+            data.allowDeepLearningSuperSampling = enabled;
+            data.deepLearningSuperSamplingUseCustomQualitySettings = enabled;
+            data.deepLearningSuperSamplingUseOptimalSettings = enabled;
+            if (enabled)
+                data.deepLearningSuperSamplingQuality = Dlss switch
+                {
+                    // HDRP's DLSS quality index: 0 performance, 1 balanced, 2 quality, 3 ultra performance.
+                    DlssMode.Quality => 2u,
+                    DlssMode.Balanced => 1u,
+                    DlssMode.Performance => 0u,
+                    _ => 3u,
+                };
+        }
+        _camera.allowDynamicResolution = enabled;
+    }
+
     private void SyncRightEyeSettings()
     {
         if (_sourceData != null && _rightEyeData != null && --_framesUntilSettingsSync <= 0)
@@ -295,6 +352,8 @@ internal sealed class VrCameraRig
             _framesUntilSettingsSync = SettingsSyncIntervalFrames;
         }
 
+        ApplyDlss();
+        _rightEye.allowDynamicResolution = _camera.allowDynamicResolution;
         _rightEye.cullingMask = _camera.cullingMask;
         _rightEye.nearClipPlane = _camera.nearClipPlane;
         _rightEye.farClipPlane = _camera.farClipPlane;

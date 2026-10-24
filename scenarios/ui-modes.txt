@@ -1,0 +1,45 @@
+# UI panel modes on the main menu: the curved panel still takes laser clicks where the flat one did, and the helmet
+# display follows the head (a pointer straight ahead from the head hits its centre wherever the head turns).
+
+waitfor vrRendering == 1 120
+config UiFollow Lazy
+config UiDistance 1.8
+config UiWidth 2.4
+config CurvedUi true
+head 0 1.6 0  0 0 0
+hand right 0 1.6 0  6.2 -25 0
+recenter
+key 0x0D
+wait 8
+keyuntil 0x1B 4 mainMenu == 1 90
+wait 3
+expect laserOnPanel == 1
+expect laserU < 0.35
+expect laserV == 0.415 0.03
+snapshot
+
+# Helmet display: turn the head 40 degrees right and look a little down; the panel comes along.
+config UiFollow Helmet
+head 0 1.6 0  10 40 0
+hand right 0 1.6 0  10 40 0
+wait 2
+expect laserOnPanel == 1
+expect laserU == 0.5 0.05
+expect laserV == 0.5 0.05
+snapshot
+head 0 1.6 0  -15 -30 0
+hand right 0 1.6 0  -15 -30 0
+wait 2
+expect laserU == 0.5 0.05
+expect laserV == 0.5 0.05
+
+# Back to the curved Lazy panel: clicking "Play Prologue" with the laser still starts the prologue.
+config UiFollow Lazy
+head 0 1.6 0  0 0 0
+hand right 0 1.6 0  6.2 -25 0
+recenter
+wait 2
+input right.trigger 1
+wait 0.3
+input right.trigger 0
+waitfor inLevel == 1 150

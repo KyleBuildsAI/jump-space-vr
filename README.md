@@ -30,6 +30,12 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
   controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal.
 - **Mod menu (Insert).** An in-headset settings menu. It covers UI follow mode and size, comfort options, turning,
   motion controls and weapon offsets.
+- **UI styles.** A flat or curved panel that stays put, eases after you, or follows your face, or a **Helmet**
+  display: the HUD sits on your visor (head-locked, wide and curved, slightly lagging like a helmet HUD).
+- **Two-handed guns.** With "Weapon in hand" on, bring your left hand to the gun's fore-end (two blue rings show
+  where) and hold grip to steady and aim the gun with both hands.
+- **DLSS in VR.** The game's built-in NVIDIA DLSS can be forced on for both eyes, for sharper edges or more frame
+  rate at high render scales.
 - **Comfort.**
   - Head bob, recoil kick and knockback shake are removed from your view.
   - The game never pitches or rolls the horizon.
@@ -108,13 +114,16 @@ launch with the mod.
 | `StartInVr` | `true` | Start VR automatically once the game has loaded. |
 | `PositionalTracking` | `true` | 6DoF. Set to `false` for rotation-only tracking. |
 | `WorldScale` | `1.0` | Scales your head movement. |
-| `RenderScale` | `1.0` | Eye resolution multiplier (0.5–2.0). Lower it for performance. |
+| `RenderScale` | `1.0` | Eye resolution multiplier (0.5–3.0). Lower it for performance; combine high values with DLSS. |
 | `MoveUiIntoVr` | `true` | Show the UI panel in the headset. |
 | `UiDistance` / `UiWidth` | `1.6` / `1.9` | UI panel distance and width, in meters. |
 | `ControllersAsGamepad` | `true` | Use VR controllers as a gamepad. |
 | `AimEye` | `Right` | While aiming down sights (left trigger), line the sights up with this eye: `Right`, `Left` or `Center`. |
 | `ViewDistance` | `1.0` | Draw distance multiplier (level of detail and far clip), 0.5–4. Higher costs frame rate. |
 | `ShowFrameRate` | `false` | Show the frame rate in the top-left of the UI panel. |
+| `Dlss` | `Game` | NVIDIA DLSS for both eyes: `Game` follows the game's graphics option; `Off`, `Quality`, `Balanced`, `Performance`, `UltraPerformance` force it. At high render scales `Performance` gave about +20% frame rate in testing. |
+| `CurvedUi` | `false` | Bend the UI panel around you. |
+| `ShowCrosshair` | `false` | Show the game's crosshair on the UI panel (it doesn't line up with a gun aimed by hand). |
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
@@ -230,6 +239,8 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu; left stick navigates, A toggles a setting, B closes |
 | `vr-toggle.txt` (~1 min) | F8 turns VR off and on three times; the session restarts cleanly and hands, laser and weapon fix work afterwards |
 | `hangar-options.txt` (~2 min) | Enters the hangar (gun in hand): gun drawn by the eye cameras, sights move to the right eye while aiming, view distance, frame-rate counter |
+| `ui-modes.txt` (~1 min) | Curved panel still takes laser clicks; the helmet display follows the head |
+| `dlss.txt` (~2 min) | DLSS runs on both eye cameras when forced on (prints frame rate off / Quality / Performance at render scale 2) |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
