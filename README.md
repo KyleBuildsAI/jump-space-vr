@@ -5,8 +5,21 @@ A PC VR mod for [Jump Space](https://store.steampowered.com/app/1757300/Jump_Spa
 
 It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR and others.
 
-> Status: early. Rendering, head tracking, the UI panel, controllers and the desktop mirror are implemented and
-> tested against Unity's OpenXR mock runtime. Expect rough edges in specific game screens.
+## Download
+
+### [⬇ Download Jump Space VR (latest)](https://github.com/KyleBuildsAI/jump-space-vr/releases/latest/download/JumpSpaceVR.zip)
+
+1. Download the zip above and extract it anywhere (right-click > **Extract All**).
+2. Close Jump Space, then double-click **`Install.bat`**. It finds the game and sets everything up.
+3. Start your VR app (SteamVR / Steam Link, Virtual Desktop or Meta Quest Link), then launch Jump Space from Steam.
+   The first launch takes a few extra minutes; VR starts by itself.
+
+Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
+[Releases](https://github.com/KyleBuildsAI/jump-space-vr/releases). `QUICKSTART.txt` in the zip has the controls.
+
+> Status: early access, like the game. Played on a Quest 3 over Steam Link and tested headlessly against Unity's
+> OpenXR mock runtime. Expect rough edges in specific game screens; please report them in
+> [Issues](https://github.com/KyleBuildsAI/jump-space-vr/issues) with your `MelonLoader/Latest.log`.
 
 ## Features
 
@@ -61,8 +74,7 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
 
 ## Install
 
-**From a release zip (no .NET SDK needed):** extract `JumpSpaceVR-<version>.zip`, close the game and double-click
-`Install.bat`. Then continue at step 4 below.
+**From a release zip (no .NET SDK needed):** see [Download](#download) above. Then continue at step 4 below.
 
 **From source:**
 
@@ -290,6 +302,11 @@ runtime, for example SteamVR's `steamxr_win64.json` with its null driver enabled
 with a simulated headset.
 
 `Jump Space VR mod research.md` contains the background feasibility research.
+
+## License
+
+MIT, see [LICENSE](LICENSE). This is a fan-made mod, not affiliated with or endorsed by Keepsake Games. It ships no
+game files.
 
 ## Third-party components
 
