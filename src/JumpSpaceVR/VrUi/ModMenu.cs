@@ -20,8 +20,14 @@ internal sealed class ModMenu
 {
     private const string RootName = "JumpSpaceVR_ModMenu";
     private const float StickThreshold = 0.6f;
+    // Holding a direction repeats it: after a short delay, then faster, and after FastAfter seconds numbers move in
+    // bigger steps, so long ranges don't need dozens of presses.
     private const float RepeatDelay = 0.4f;
     private const float RepeatInterval = 0.12f;
+    private const float FastRepeatInterval = 0.05f;
+    private const float FastAfter = 1.5f;
+    private const float BigStepsAfter = 3f;
+    private const int BigStep = 5;
 
     private sealed class Item
     {
@@ -38,6 +44,7 @@ internal sealed class ModMenu
     private bool _dirty = true;
 
     private int _heldDirection;
+    private float _heldSince;
     private float _nextRepeatTime;
     private bool _confirmHeld;
     private bool _backHeld;
@@ -58,7 +65,7 @@ internal sealed class ModMenu
             Change = direction =>
             {
                 var index = Array.IndexOf(values, entry.Value);
-                entry.Value = values[(index + direction + values.Length) % values.Length];
+                entry.Value = values[(index + Math.Sign(direction) + values.Length) % values.Length];
                 onChanged?.Invoke(entry.Value);
             },
         });
@@ -94,6 +101,31 @@ internal sealed class ModMenu
     {
         _items.Add(new Item { Label = label, Value = () => "", Activate = action });
     }
+
+    /// <summary>An action that only runs when activated twice within a few seconds (for destructive actions).</summary>
+    public void AddConfirmedAction(string label, Action action)
+    {
+        var armedUntil = 0f;
+        _items.Add(new Item
+        {
+            Label = label,
+            Value = () => Time.unscaledTime < armedUntil ? "press again to confirm" : "",
+            Activate = () =>
+            {
+                if (Time.unscaledTime < armedUntil)
+                {
+                    armedUntil = 0f;
+                    action();
+                }
+                else
+                {
+                    armedUntil = Time.unscaledTime + ConfirmSeconds;
+                }
+            },
+        });
+    }
+
+    private const float ConfirmSeconds = 4f;
 
     // ---- lifecycle ----
 
@@ -145,45 +177,72 @@ internal sealed class ModMenu
             Close();
             return;
         }
-        if (keys.WasPressed(KeyCode.UpArrow))
-            Move(-1);
-        if (keys.WasPressed(KeyCode.DownArrow))
-            Move(1);
-        if (keys.WasPressed(KeyCode.LeftArrow))
-            Change(-1);
-        if (keys.WasPressed(KeyCode.RightArrow))
-            Change(1);
         if (keys.WasPressed(KeyCode.Return))
             Activate();
 
-        HandleController(controllers);
+        HandleDirection(KeyboardDirection(keys), StickDirection(controllers));
+        HandleButtons(controllers);
 
         if (_dirty)
             Render();
     }
 
-    private void HandleController(in ControllerState controllers)
+    private static int KeyboardDirection(Controls.HotkeyReader keys)
+    {
+        if (keys.IsDown(KeyCode.UpArrow)) return -1;
+        if (keys.IsDown(KeyCode.DownArrow)) return 1;
+        if (keys.IsDown(KeyCode.RightArrow)) return 2;
+        if (keys.IsDown(KeyCode.LeftArrow)) return -2;
+        return 0;
+    }
+
+    private static int StickDirection(in ControllerState controllers)
+    {
+        if (!controllers.IsActive)
+            return 0;
+        var stick = controllers.LeftStick;
+        if (stick.y > StickThreshold) return -1;
+        if (stick.y < -StickThreshold) return 1;
+        if (stick.x > StickThreshold) return 2;
+        if (stick.x < -StickThreshold) return -2;
+        return 0;
+    }
+
+    /// <summary>Up/down moves the selection, left/right changes the value; holding repeats and speeds up.</summary>
+    private void HandleDirection(int keyboard, int stick)
+    {
+        var direction = keyboard != 0 ? keyboard : stick;
+        var now = Time.unscaledTime;
+        if (direction != _heldDirection)
+        {
+            _heldDirection = direction;
+            _heldSince = now;
+            if (direction == 0)
+                return;
+            Step(direction, 1);
+            _nextRepeatTime = now + RepeatDelay;
+            return;
+        }
+
+        if (direction == 0 || now < _nextRepeatTime)
+            return;
+        var held = now - _heldSince;
+        _nextRepeatTime = now + (held >= FastAfter ? FastRepeatInterval : RepeatInterval);
+        Step(direction, held >= BigStepsAfter ? BigStep : 1);
+    }
+
+    private void Step(int direction, int size)
+    {
+        if (Math.Abs(direction) == 1)
+            Move(direction);
+        else
+            Change(Math.Sign(direction) * size);
+    }
+
+    private void HandleButtons(in ControllerState controllers)
     {
         if (!controllers.IsActive)
             return;
-
-        var stick = controllers.LeftStick;
-        var direction = 0;
-        if (stick.y > StickThreshold) direction = -1;
-        else if (stick.y < -StickThreshold) direction = 1;
-        else if (stick.x > StickThreshold) direction = 2;
-        else if (stick.x < -StickThreshold) direction = -2;
-
-        var now = Time.unscaledTime;
-        if (direction != 0 && (direction != _heldDirection || now >= _nextRepeatTime))
-        {
-            _nextRepeatTime = now + (direction != _heldDirection ? RepeatDelay : RepeatInterval);
-            if (Math.Abs(direction) == 1)
-                Move(direction);
-            else
-                Change(Math.Sign(direction));
-        }
-        _heldDirection = direction;
 
         if (controllers.ButtonA && !_confirmHeld)
             Activate();
@@ -269,7 +328,7 @@ internal sealed class ModMenu
             var panelRect = panel.GetComponent<RectTransform>();
             panelRect.anchorMin = new Vector2(0.5f, 0.5f);
             panelRect.anchorMax = new Vector2(0.5f, 0.5f);
-            panelRect.sizeDelta = new Vector2(900f, 1010f);
+            panelRect.sizeDelta = new Vector2(900f, 1060f);
 
             var label = new GameObject("Text");
             label.transform.SetParent(panel.transform, false);
@@ -277,7 +336,7 @@ internal sealed class ModMenu
             var font = TMP_Settings.defaultFontAsset;
             if (font != null)
                 _text.font = font;
-            _text.fontSize = 25f;
+            _text.fontSize = 23f;
             _text.richText = true;
             _text.raycastTarget = false;
             _text.color = Color.white;

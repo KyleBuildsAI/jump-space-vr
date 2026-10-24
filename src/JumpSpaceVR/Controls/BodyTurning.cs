@@ -2,6 +2,14 @@ using UnityEngine;
 
 namespace JumpSpaceVR.Controls;
 
+/// <summary>The eye that aiming down sights is lined up with.</summary>
+internal enum AimEye
+{
+    Right,
+    Left,
+    Center,
+}
+
 /// <summary>How the right thumbstick turns the player's body while motion controls are on.</summary>
 internal enum TurnMode
 {

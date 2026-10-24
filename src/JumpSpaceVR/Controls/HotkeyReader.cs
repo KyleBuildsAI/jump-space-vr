@@ -39,6 +39,13 @@ internal sealed class HotkeyReader
         return Application.isFocused;
     }
 
+    /// <summary>True while the key is held down and the game window has focus.</summary>
+    public bool IsDown(KeyCode key)
+    {
+        var virtualKey = ToVirtualKey(key);
+        return virtualKey != 0 && Application.isFocused && (GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+    }
+
     private static int ToVirtualKey(KeyCode key)
     {
         if (key >= KeyCode.F1 && key <= KeyCode.F15)

@@ -1,0 +1,60 @@
+# In the hangar (where the player carries a gun): the gun is drawn by the eye cameras, aiming down sights moves the sights to
+# the right eye, view distance and the frame-rate counter apply. Enters the hangar from the main menu with the laser
+# (the hangar can take a few minutes to load).
+
+waitfor vrRendering == 1 120
+# Default UI panel placement, so the laser lands on the same menu item whatever the player has set.
+config UiFollow Lazy
+config UiDistance 1.8
+config UiWidth 2.4
+head 0 1.6 0  0 0 0
+hand right 0 1.6 0  7.1 -25 0
+recenter
+key 0x0D
+wait 8
+keyuntil 0x1B 4 mainMenu == 1 90
+wait 3
+# "Enter Hangar", the second menu item.
+expect laserV == 0.39 0.012
+input right.trigger 1
+wait 0.3
+input right.trigger 0
+# The game asks to confirm entering the hangar before the prologue has been played; F confirms.
+wait 3
+key 0x46
+waitfor holdsItem == 1 360
+wait 20
+recenter
+head 0 1.6 0  20 0 0
+hand right 0.15 1.35 0.35  15 0 0
+wait 3
+
+expect weaponLayerInEyes == 1
+expect flatWeaponPassSkips > 0
+expect itemLocator == 1
+
+# Aiming down sights (left trigger): the weapon moves sideways by about half the eye distance (3.2 cm).
+config WeaponInHand false
+config AimEye Right
+input left.trigger 1
+wait 1
+expect sightShiftCm == 3.2 0.6
+input left.trigger 0
+wait 1
+expect sightShiftCm == 0 0.1
+
+# View distance doubles the far clip plane and level-of-detail distance.
+config ViewDistance 2
+wait 1
+expect eyeFarClip > 0
+log far clip with view distance 2 (check against 1 below)
+expect lodBias > 0
+config ViewDistance 1
+wait 1
+expect eyeFarClip > 0
+expect lodBias > 0
+
+config ShowFrameRate true
+wait 1
+expect frameRateShown == 1
+snapshot
