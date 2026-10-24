@@ -383,7 +383,9 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (_config.RoomscaleWalking.Value && _config.PositionalTracking.Value && !_modMenu.IsOpen)
             state.LeftStick = _roomscale.AddWalkInput(state.LeftStick, _headTracker.LocalPosition);
 
-        _motion.ProcessInput(ref state, _config.MotionControls.Value && !_modMenu.IsOpen, _config.TurnMode.Value,
+        // The galaxy map is steered with the sticks (it selects what is under its centre reticle), so motion aim and
+        // stick turning step aside there.
+        _motion.ProcessInput(ref state, _config.MotionControls.Value && !_modMenu.IsOpen && !_mapView, _config.TurnMode.Value,
             _config.SnapTurnAngle.Value, _config.SmoothTurnSpeed.Value);
         _lastControllerState = state;
 
@@ -428,6 +430,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "handFramesSent" => _handSync.FramesSent,
             "handFramesReceived" => _handSync.FramesReceived,
             "firstPersonOverride" => _firstPerson.Active ? 1f : 0f,
+            "mapView" => _mapView ? 1f : 0f,
+            "cameraX" => camera != null ? camera.transform.position.x : null,
+            "cameraZ" => camera != null ? camera.transform.position.z : null,
+            "viewPitch" => -Mathf.DeltaAngle(0f, _cameraRig.ViewRotation.eulerAngles.x),
             "frameTiltDeg" => _frame.Tilt,
             "cameraHeadDistanceCm" => _firstPerson.CameraDistance * 100f,
             "pointerTargets" => _pointerAssist.TargetCount,
@@ -537,6 +543,17 @@ public sealed class JumpSpaceVrMod : MelonMod
         return false;
     }
 
+    /// <summary>Test scenarios: uses the hangar's galaxy map terminal for the local player.</summary>
+    private static void OpenGalaxyMap()
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        var terminals = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.GameplayFeatures.GalaxyMap.GalaxyMapInteraction>(FindObjectsSortMode.None);
+        if (player == null || terminals.Length == 0)
+            throw new InvalidOperationException("no local player or galaxy map terminal");
+        terminals[0].OnInteractionPredicted(player);
+    }
+
     private void ScenarioCommand(string command)
     {
         switch (command)
@@ -550,6 +567,9 @@ public sealed class JumpSpaceVrMod : MelonMod
                 break;
             case "recenter":
                 _recenterPending = true;
+                break;
+            case "galaxymap":
+                OpenGalaxyMap();
                 break;
             case "rig":
                 Log.Msg("First-person rig hierarchy:" + Environment.NewLine + _motion.DescribeRigHierarchy());
@@ -613,6 +633,37 @@ public sealed class JumpSpaceVrMod : MelonMod
         _uiCompositor.CursorUv = new Vector2(assisted.x / Screen.width, assisted.y / Screen.height);
         _pointerScreen = assisted;
         _pointerOwnsCursor = !inLevel;
+    }
+
+    private bool _mapView;
+    private int _mapCheckFrame;
+    private const int MapCheckIntervalFrames = 15;
+
+    /// <summary>
+    /// Notices when the game shows the galaxy map. It doesn't switch cameras for that: it moves the main camera's
+    /// root under the map's rig, so the camera's ancestors are checked a few times a second.
+    /// </summary>
+    private void UpdateMapView(Camera camera)
+    {
+        if (Time.frameCount < _mapCheckFrame)
+            return;
+        _mapCheckFrame = Time.frameCount + MapCheckIntervalFrames;
+        var wasMap = _mapView;
+        _mapView = camera != null && IsGalaxyMapCamera(camera.transform);
+        if (_mapView != wasMap)
+            Log.Msg(_mapView ? "Galaxy map: shown at its camera's angle; the sticks steer it." : "Left the galaxy map.");
+    }
+
+    private static bool IsGalaxyMapCamera(Transform camera)
+    {
+        if (camera.GetComponentInParent<Il2CppKeepsake.GameplayFeatures.GalaxyMap.GalaxyMapCamera>() != null)
+            return true;
+        for (var parent = camera; parent != null; parent = parent.parent)
+        {
+            if (parent.name.StartsWith("PF_GalaxyMap", StringComparison.Ordinal))
+                return true;
+        }
+        return false;
     }
 
     private float? _gameLodBias;
@@ -941,10 +992,11 @@ public sealed class JumpSpaceVrMod : MelonMod
                 _cutsceneCheckFrame = Time.frameCount + InLevelCheckIntervalFrames;
                 _cutscene = IsCutscenePlaying();
             }
+            UpdateMapView(Camera.main);
             var firstPersonHead = _firstPerson.Update(_config.ForceFirstPerson.Value, Camera.main, _cutscene);
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
-                    _config.ClampedViewDistance, firstPersonHead, _frame.Rotation))
+                    _config.ClampedViewDistance, firstPersonHead, _frame.Rotation, fullRotation: _mapView))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;

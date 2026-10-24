@@ -26,6 +26,7 @@ namespace JumpSpaceVR.Testing;
 ///   pad rightstick 1 0                        scripted gamepad: leftstick/rightstick x y, lefttrigger/righttrigger v,
 ///                                             a/b/x/y/start/view 0|1, release (see TestGamepad)
 ///   print fps cpuMainMs                       log metric values without checking them
+///   galaxymap                                 open the galaxy map as if the player used its terminal
 ///   snapshot | diagnostics | recenter | log text | quit
 /// </summary>
 internal sealed class ScenarioRunner
@@ -180,6 +181,7 @@ internal sealed class ScenarioRunner
                 case "pad":
                     _command($"pad {parts[1]} {(parts.Length > 2 ? parts[2] : "0")} {(parts.Length > 3 ? parts[3] : "0")}");
                     break;
+                case "galaxymap":
                 case "rig":
                 case "snapshot":
                 case "diagnostics":
