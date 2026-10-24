@@ -12,7 +12,11 @@ internal enum VrGraphicsQuality
     High,
     /// <summary>Also drops screen-space reflections and global illumination, contact shadows and volumetric clouds.</summary>
     Medium,
-    /// <summary>Also drops volumetric fog, ambient occlusion, refraction and distortion.</summary>
+    /// <summary>
+    /// Also drops volumetric fog, ambient occlusion, refraction, distortion and per-object motion vectors (moving
+    /// objects can smear a little with DLSS or TAA; the motion vector pass is drawn once per eye and cost ~10% frame
+    /// rate in the hangar).
+    /// </summary>
     Low,
 }
 
@@ -39,9 +43,31 @@ internal sealed class GraphicsQuality
     {
         FrameSettingsField.Volumetrics, FrameSettingsField.SSAO, FrameSettingsField.Refraction,
         FrameSettingsField.RoughRefraction, FrameSettingsField.Distortion, FrameSettingsField.RoughDistortion,
+        FrameSettingsField.ObjectMotionVectors,
     };
 
     private readonly Dictionary<int, Dictionary<FrameSettingsField, (bool Overridden, bool Enabled)>> _originals = new();
+    private readonly HashSet<FrameSettingsField> _extraOff = new();
+    private readonly HashSet<FrameSettingsField> _everExtra = new();
+
+    /// <summary>
+    /// Developer option for measuring: more frame settings to switch off, by name, comma separated
+    /// (for example "Decals,TransparentObjects"). Unknown names are ignored.
+    /// </summary>
+    public void SetExtraOff(string names)
+    {
+        _extraOff.Clear();
+        foreach (var name in (names ?? "").Split(',', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries))
+        {
+            if (System.Enum.TryParse<FrameSettingsField>(name, true, out var field))
+            {
+                _extraOff.Add(field);
+                _everExtra.Add(field);
+            }
+            else
+                Log.Warning($"Unknown frame setting '{name}'.");
+        }
+    }
 
     /// <summary>Applies the quality to one camera's HDRP data. Call when the setting or the camera changes.</summary>
     public void Apply(HDAdditionalCameraData data, VrGraphicsQuality quality)
@@ -62,6 +88,7 @@ internal sealed class GraphicsQuality
             off.UnionWith(MediumOff);
         if (quality >= VrGraphicsQuality.Low)
             off.UnionWith(LowOff);
+        off.UnionWith(_extraOff);
 
         data.customRenderingSettings = true;
         // Through the backing field: the interop's by-reference property hands out a copy, so writes to it are lost.
@@ -90,8 +117,10 @@ internal sealed class GraphicsQuality
         data.m_RenderingPathCustomFrameSettings = settings;
     }
 
-    private static IEnumerable<FrameSettingsField> Fields()
+    private IEnumerable<FrameSettingsField> Fields()
     {
+        foreach (var field in _everExtra)
+            yield return field;
         foreach (var field in HighOff)
             yield return field;
         foreach (var field in MediumOff)
