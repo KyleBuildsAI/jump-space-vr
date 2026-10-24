@@ -19,7 +19,7 @@ namespace JumpSpaceVR.Controls;
 /// </summary>
 internal sealed unsafe class VirtualGamepad
 {
-    private const string DeviceName = "JumpSpaceVR Controllers";
+    public const string DeviceName = "JumpSpaceVR Controllers";
     private const int StateEventType = 0x53544154;   // FourCC 'STAT' (first char in the high byte)
     private const int GamepadFormat = 0x47504144;    // FourCC 'GPAD'
     private const float StickDeadzone = 0.12f;
@@ -28,7 +28,7 @@ internal sealed unsafe class VirtualGamepad
     // GamepadButton bit indices in GamepadState.buttons.
     private const int ButtonNorth = 4, ButtonEast = 5, ButtonSouth = 6, ButtonWest = 7;
     private const int ButtonLeftStick = 8, ButtonRightStick = 9, ButtonLeftShoulder = 10, ButtonRightShoulder = 11;
-    private const int ButtonStart = 12;
+    private const int ButtonStart = 12, ButtonSelect = 13;
 
     [StructLayout(LayoutKind.Sequential, Pack = 1)]
     private struct GamepadStateEvent
@@ -49,11 +49,14 @@ internal sealed unsafe class VirtualGamepad
         public float RightTrigger;
     }
 
+    private readonly string _deviceName;
     private InputDevice _device;
     private bool _creationFailed;
     private bool _wasActive;
     private (uint Buttons, Vector2 LeftStick, Vector2 RightStick, float LeftTrigger, float RightTrigger)? _lastSent;
     private bool _wasFocused;
+
+    public VirtualGamepad(string deviceName = DeviceName) => _deviceName = deviceName;
 
     public bool Send(in ControllerState controllers)
     {
@@ -97,9 +100,9 @@ internal sealed unsafe class VirtualGamepad
 
         try
         {
-            _device = InputSystem.AddDevice("Gamepad", DeviceName, null);
+            _device = InputSystem.AddDevice("Gamepad", _deviceName, null);
             _lastSent = null;
-            Log.Msg($"Virtual gamepad added (device id {_device.deviceId}).");
+            Log.Msg($"Virtual gamepad '{_deviceName}' added (device id {_device.deviceId}).");
             return true;
         }
         catch (Exception exception)
@@ -160,6 +163,7 @@ internal sealed unsafe class VirtualGamepad
         Set(ref buttons, ButtonLeftStick, controllers.LeftStickClick);
         Set(ref buttons, ButtonRightStick, controllers.RightStickClick);
         Set(ref buttons, ButtonStart, controllers.Menu);
+        Set(ref buttons, ButtonSelect, controllers.View);
         return buttons;
     }
 

@@ -29,6 +29,8 @@ internal struct ControllerState
     public bool ButtonX;
     public bool ButtonY;
     public bool Menu;
+    /// <summary>View/Select/Share (only real or test gamepads have it).</summary>
+    public bool View;
     public bool LeftStickClick;
     public bool RightStickClick;
 
@@ -57,14 +59,17 @@ internal sealed unsafe class OpenXRControllers
     private const int TypeActionStateGetInfo = 58;
     private const int TypeSessionActionSetsAttachInfo = 60;
     private const int TypeActionsSyncInfo = 61;
+    private const int TypeHapticActionInfo = 59;
+    private const int TypeHapticVibration = 13;
 
-    private enum ActionType { Boolean = 1, Float = 2, Vector2 = 3, Pose = 4 }
+    private enum ActionType { Boolean = 1, Float = 2, Vector2 = 3, Pose = 4, Vibration = 100 }
 
     private enum Action
     {
         LeftStick, RightStick, LeftTrigger, RightTrigger, LeftGrip, RightGrip,
         ButtonA, ButtonB, ButtonX, ButtonY, Menu, LeftStickClick, RightStickClick,
         LeftGripPose, RightGripPose, LeftAimPose, RightAimPose,
+        LeftHaptic, RightHaptic,
     }
 
     private static readonly (Action Action, string Name, ActionType Type)[] ActionDefinitions =
@@ -86,6 +91,15 @@ internal sealed unsafe class OpenXRControllers
         (Action.RightGripPose, "right_grip_pose", ActionType.Pose),
         (Action.LeftAimPose, "left_aim_pose", ActionType.Pose),
         (Action.RightAimPose, "right_aim_pose", ActionType.Pose),
+        (Action.LeftHaptic, "left_haptic", ActionType.Vibration),
+        (Action.RightHaptic, "right_haptic", ActionType.Vibration),
+    };
+
+    /// <summary>Vibration outputs, shared by every interaction profile.</summary>
+    private static readonly (Action Action, string Path)[] HapticBindings =
+    {
+        (Action.LeftHaptic, "/user/hand/left/output/haptic"),
+        (Action.RightHaptic, "/user/hand/right/output/haptic"),
     };
 
     /// <summary>Hand pose bindings shared by every interaction profile.</summary>
@@ -298,6 +312,70 @@ internal sealed unsafe class OpenXRControllers
     private bool _setupFailed;
     private int _syncFailures;
 
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrHapticActionInfo
+    {
+        public int Type;
+        public void* Next;
+        public ulong Action;
+        public ulong SubactionPath;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XrHapticVibration
+    {
+        public int Type;
+        public void* Next;
+        public long Duration;
+        public float Frequency;
+        public float Amplitude;
+    }
+
+    private delegate* unmanaged<ulong, XrHapticActionInfo*, XrHapticVibration*, int> _applyHaptic;
+    private int _hapticGeneration = -1;
+    private bool _hapticFailureReported;
+
+    /// <summary>Haptic pulses sent (diagnostics and tests).</summary>
+    public int HapticPulses { get; private set; }
+
+    /// <summary>Vibrates one controller. Amplitude 0..1; frequency left to the runtime.</summary>
+    public void Pulse(bool rightHand, float amplitude, float seconds)
+    {
+        if (!IsReady || amplitude <= 0f || seconds <= 0f)
+            return;
+        if (_hapticGeneration != OpenXRHooks.Generation)
+        {
+            _applyHaptic = (delegate* unmanaged<ulong, XrHapticActionInfo*, XrHapticVibration*, int>)OpenXRHooks.Resolve("xrApplyHapticFeedback");
+            _hapticGeneration = OpenXRHooks.Generation;
+        }
+        if (_applyHaptic == null || !_actions.TryGetValue(rightHand ? Action.RightHaptic : Action.LeftHaptic, out var action))
+        {
+            if (!_hapticFailureReported)
+            {
+                _hapticFailureReported = true;
+                Log.Warning($"Controller vibration unavailable (xrApplyHapticFeedback {(_applyHaptic == null ? "missing" : "found")}, action {(_actions.ContainsKey(Action.RightHaptic) ? "created" : "missing")}).");
+            }
+            return;
+        }
+
+        var info = new XrHapticActionInfo { Type = TypeHapticActionInfo, Action = action };
+        var vibration = new XrHapticVibration
+        {
+            Type = TypeHapticVibration,
+            Duration = (long)(seconds * 1_000_000_000d),
+            Frequency = 0f,
+            Amplitude = Mathf.Clamp01(amplitude),
+        };
+        var result = _applyHaptic(_attachedSession, &info, &vibration);
+        if (result == XrSuccess)
+            HapticPulses++;
+        else if (!_hapticFailureReported)
+        {
+            _hapticFailureReported = true;
+            Log.Warning($"Controller vibration rejected by the runtime ({result}).");
+        }
+    }
+
     public bool IsReady => _attachedSession != 0 && _generation == OpenXRHooks.Generation && _attachedSession == OpenXRHooks.Session;
 
     /// <summary>Creates and attaches the action set. Must run after the session exists and before it begins.</summary>
@@ -330,7 +408,7 @@ internal sealed unsafe class OpenXRControllers
                 return false;
 
             foreach (var (profile, bindings) in Profiles)
-                SuggestBindings(instance, profile, Concat(bindings, PoseBindings));
+                SuggestBindings(instance, profile, Concat(Concat(bindings, PoseBindings), HapticBindings));
 
             var session = OpenXRHooks.Session;
             var actionSet = _actionSet;

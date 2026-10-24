@@ -23,6 +23,8 @@ namespace JumpSpaceVR.Testing;
 ///   keyuntil 0x1B 3 cursorFree == 1 60        press a key every 3 s until the condition holds (timeout 60 s)
 ///   expect aimYawOffset == 30 3               metric, operator, value, tolerance (for ==)
 ///   config StabilizeView false                change a mod setting for this run only (restored when it ends)
+///   pad rightstick 1 0                        scripted gamepad: leftstick/rightstick x y, lefttrigger/righttrigger v,
+///                                             a/b/x/y/start/view 0|1, release (see TestGamepad)
 ///   snapshot | diagnostics | recenter | log text | quit
 /// </summary>
 internal sealed class ScenarioRunner
@@ -168,6 +170,9 @@ internal sealed class ScenarioRunner
                     break;
                 case "config":
                     _command($"config {parts[1]} {parts[2]}");
+                    break;
+                case "pad":
+                    _command($"pad {parts[1]} {(parts.Length > 2 ? parts[2] : "0")} {(parts.Length > 3 ? parts[3] : "0")}");
                     break;
                 case "rig":
                 case "snapshot":

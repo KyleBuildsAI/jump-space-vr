@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Il2CppInterop.Runtime.InteropTypes.Arrays;
 using UnityEngine;
 
 namespace JumpSpaceVR.Controls;
@@ -45,6 +46,7 @@ internal sealed class VrArms
     private Vector3 _locatorBasePosition;
     private Quaternion _locatorBaseRotation;
     private bool _locatorMoved;
+    private bool _bindFailed;
 
     private sealed class Bone
     {
@@ -101,15 +103,15 @@ internal sealed class VrArms
         TwoHanded = false;
         CanGrab = false;
         Barrel = null;
-        SetHighlight(null);
+        SetHighlight(null, Quaternion.identity);
     }
 
     /// <summary>
-    /// Places the weapon and arms for this frame. Hand poses are world space; <paramref name="leftGrip"/> is the left
-    /// controller's grip value.
+    /// Places the weapon and arms for this frame. Hand poses are world space (position of the grip, rotation of the
+    /// aim pose); <paramref name="leftGrip"/> is the left controller's grip value.
     /// </summary>
     public bool Update(Transform rig, HandPose rightHand, Quaternion rightAim, HandPose? leftHand, float leftGrip, Vector3 gripOffset,
-        Quaternion bodyRotation)
+        Quaternion bodyRotation, float leftHandRoll)
     {
         // Only while something is held (in the prologue the arms are animated without an item; leave them alone).
         if (!Bind(rig) || _locator.childCount == 0)
@@ -153,12 +155,22 @@ internal sealed class VrArms
         // Left hand: on the fore-end when holding it (or when the left controller isn't tracked, as in the flat
         // game), otherwise following the left controller.
         var leftOnWeapon = TwoHanded || !leftHand.HasValue;
-        var leftTarget = leftOnWeapon ? Absolute(placed, leftInWeapon) : new HandPose(leftHand.Value.position, _leftArm.Hand.rotation);
-        SolveArm(_leftArm, leftTarget, bodyRotation, -1f, keepHandRotation: !leftOnWeapon);
+        // A free hand keeps the game's fore-end grip shape but turns with the left controller, as if that controller
+        // were the gun's fore-end, so it follows the wrist instead of staying in the animated (upside-down) pose.
+        var leftTarget = leftOnWeapon
+            ? Absolute(placed, leftInWeapon)
+            : new HandPose(leftHand.Value.position,
+                leftHand.Value.rotation * Quaternion.AngleAxis(leftHandRoll, Vector3.forward) * leftInWeapon.rotation);
+        SolveArm(_leftArm, leftTarget, bodyRotation, -1f);
         LeftHandError = Vector3.Distance(_leftArm.Hand.position, leftTarget.position);
 
         // Show where to grab while the free left hand is close to the fore-end.
-        SetHighlight(CanGrab && !TwoHanded ? Absolute(placed, leftInWeapon).position : null);
+        if (CanGrab && !TwoHanded)
+        {
+            SetHighlight(ForeEndCenter(Absolute(placed, leftInWeapon).position, weaponRotation), weaponRotation);
+        }
+        else
+            SetHighlight(null, weaponRotation);
         return true;
     }
 
@@ -186,7 +198,7 @@ internal sealed class VrArms
             TwoHanded = false;
     }
 
-    private void SolveArm(Bone arm, HandPose target, Quaternion bodyRotation, float side, bool keepHandRotation = false)
+    private void SolveArm(Bone arm, HandPose target, Quaternion bodyRotation, float side)
     {
         Save(arm.Upper);
         Save(arm.Lower);
@@ -194,7 +206,7 @@ internal sealed class VrArms
         var shoulder = arm.Upper.position;
         // Elbows hang down and slightly out to the side and back.
         var hint = shoulder + bodyRotation * new Vector3(0.35f * side, -0.6f, -0.25f);
-        var handRotation = keepHandRotation ? arm.Hand.rotation : target.rotation;
+        var handRotation = target.rotation;
 
         var armLength = Vector3.Distance(shoulder, arm.Lower.position) + Vector3.Distance(arm.Lower.position, arm.Hand.position);
         var stretch = Mathf.Clamp(Vector3.Distance(shoulder, target.position) / armLength, 1f, MaxArmStretch);
@@ -224,12 +236,16 @@ internal sealed class VrArms
             return false;
         if (rig == _rig && _locator != null && _rightArm?.Hand != null && _leftArm?.Hand != null)
             return true;
+        // A rig without the expected bones is searched (and reported) once, not every frame.
+        if (rig == _rig && _bindFailed)
+            return false;
 
         _rig = rig;
         _locator = Find(rig, "ItemAttachLocator");
         _rightArm = FindArm(rig, "Right");
         _leftArm = FindArm(rig, "Left");
         var ok = _locator != null && _rightArm != null && _leftArm != null;
+        _bindFailed = !ok;
         if (!ok)
             Log.Warning("Weapon in hand: the first-person rig has no ItemAttachLocator or arm bones; leaving it as the game places it.");
         return ok;
@@ -266,9 +282,36 @@ internal sealed class VrArms
     private static HandPose Absolute(HandPose parent, HandPose local) =>
         new(parent.position + parent.rotation * local.position, parent.rotation * local.rotation);
 
-    private void SetHighlight(Vector3? position)
+    private static readonly string[] ForeEndNames = { "Pump", "ForeGrip", "Foregrip", "FrontGrip", "Handguard", "HandGuard" };
+
+    /// <summary>
+    /// Centre of the part the left hand holds, on the gun's axis: the fore-end part if the gun has one (a pump moves,
+    /// so the rings move with it), otherwise the point on the barrel line nearest the hand's grip.
+    /// </summary>
+    private Vector3 ForeEndCenter(Vector3 leftGrip, Quaternion weaponRotation)
     {
-        if (position == null)
+        foreach (var name in ForeEndNames)
+        {
+            var part = Find(_locator, name);
+            if (part != null)
+                return part.position;
+        }
+        var muzzle = Find(_locator, "MuzzlePos");
+        if (muzzle == null)
+            return leftGrip;
+        var axis = weaponRotation * Vector3.forward;
+        return muzzle.position + axis * Vector3.Dot(leftGrip - muzzle.position, axis);
+    }
+
+    // Two glowing bands around the gun, either side of where the left hand grabs (a ring mesh, so the gun stays visible).
+    private const float RingRadius = 0.085f;
+    private const float RingTubeRadius = 0.005f;
+    private const float RingSpacing = 0.09f;
+
+    /// <summary>Two thin glowing rings around the gun, either side of where the left hand grabs.</summary>
+    private void SetHighlight(Vector3? center, Quaternion weaponRotation)
+    {
+        if (center == null)
         {
             if (_highlight != null)
                 _highlight.gameObject.SetActive(false);
@@ -280,27 +323,69 @@ internal sealed class VrArms
         if (_highlight == null)
             return;
         _highlight.gameObject.SetActive(true);
-        _highlight.position = position.Value;
+        // The rings are built around their Z axis; turn it to the barrel direction.
+        _highlight.SetPositionAndRotation(center.Value, weaponRotation);
     }
 
     private static Transform CreateHighlight()
     {
-        var sphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        sphere.name = "JumpSpaceVR_GripHighlight";
-        Object.DontDestroyOnLoad(sphere);
-        var collider = sphere.GetComponent<Collider>();
-        if (collider != null)
-            Object.Destroy(collider);
-        sphere.transform.localScale = Vector3.one * 0.05f;
-        sphere.layer = 29;
-        var renderer = sphere.GetComponent<Renderer>();
+        var root = new GameObject("JumpSpaceVR_GripHighlight");
+        Object.DontDestroyOnLoad(root);
+        root.layer = 29;
         var shader = Shader.Find("HDRP/Unlit");
-        if (renderer != null && shader != null)
+        Material material = null;
+        if (shader != null)
         {
-            var material = new Material(shader) { hideFlags = HideFlags.DontUnloadUnusedAsset };
-            material.SetColor("_UnlitColor", new Color(0.3f, 0.9f, 1f, 1f));
-            renderer.sharedMaterial = material;
+            material = new Material(shader) { hideFlags = HideFlags.DontUnloadUnusedAsset };
+            material.SetColor("_UnlitColor", new Color(0.3f, 0.85f, 1f, 1f));
         }
-        return sphere.transform;
+
+        var mesh = CreateRingMesh(RingRadius, RingTubeRadius);
+        foreach (var offset in new[] { -RingSpacing / 2f, RingSpacing / 2f })
+        {
+            var ring = new GameObject("Ring") { layer = 29 };
+            ring.transform.SetParent(root.transform, false);
+            ring.transform.localPosition = new Vector3(0f, 0f, offset);
+            ring.AddComponent<MeshFilter>().sharedMesh = mesh;
+            var renderer = ring.AddComponent<MeshRenderer>();
+            if (material != null)
+                renderer.sharedMaterial = material;
+        }
+        return root.transform;
+    }
+
+    /// <summary>A torus around the Z axis (a thin ring).</summary>
+    private static Mesh CreateRingMesh(float radius, float tubeRadius)
+    {
+        const int Segments = 40;
+        const int Sides = 8;
+        var vertices = new Vector3[Segments * Sides];
+        var triangles = new int[Segments * Sides * 6];
+        for (var segment = 0; segment < Segments; segment++)
+        {
+            var around = segment * Mathf.PI * 2f / Segments;
+            var centre = new Vector3(Mathf.Cos(around), Mathf.Sin(around), 0f);
+            for (var side = 0; side < Sides; side++)
+            {
+                var tube = side * Mathf.PI * 2f / Sides;
+                vertices[segment * Sides + side] = centre * (radius + tubeRadius * Mathf.Cos(tube)) + Vector3.forward * (tubeRadius * Mathf.Sin(tube));
+                var next = (segment + 1) % Segments;
+                var nextSide = (side + 1) % Sides;
+                var index = (segment * Sides + side) * 6;
+                triangles[index] = segment * Sides + side;
+                triangles[index + 1] = next * Sides + side;
+                triangles[index + 2] = segment * Sides + nextSide;
+                triangles[index + 3] = segment * Sides + nextSide;
+                triangles[index + 4] = next * Sides + side;
+                triangles[index + 5] = next * Sides + nextSide;
+            }
+        }
+
+        var mesh = new Mesh { name = "JumpSpaceVR_GripRing", hideFlags = HideFlags.DontUnloadUnusedAsset };
+        mesh.vertices = new Il2CppStructArray<Vector3>(vertices);
+        mesh.triangles = new Il2CppStructArray<int>(triangles);
+        mesh.RecalculateNormals();
+        mesh.RecalculateBounds();
+        return mesh;
     }
 }

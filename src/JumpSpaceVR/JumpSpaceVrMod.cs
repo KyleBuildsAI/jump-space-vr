@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.6.0", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.7.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -34,6 +34,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly StereoRenderer _stereoRenderer = new();
     private readonly VrUi.UiCompositor _uiCompositor = new();
     private readonly VirtualGamepad _gamepad = new();
+    private readonly PhysicalGamepads _pads = new(VirtualGamepad.DeviceName);
+    private Testing.TestGamepad _testPad;
     private readonly VrUi.ModMenu _modMenu = new();
     private readonly MotionControls _motion = new();
     private readonly RoomscaleLocomotion _roomscale = new();
@@ -41,6 +43,10 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VrUi.CinematicBars _cinematicBars = new();
     private readonly SessionReport _sessionReport = new();
     private readonly VrUi.FrameRateCounter _frameRateCounter = new();
+    private readonly VrUi.CrosshairHider _crosshairHider = new();
+    private readonly Tracking.HeadAudio _headAudio = new();
+    private readonly HapticFeedback _haptics = new();
+    private readonly ColorGrading _colorGrading = new();
     private float _aimDownSights;
     private Vector3 _lastSightShift;
     private ControllerState _rawControllerState;
@@ -107,9 +113,15 @@ public sealed class JumpSpaceVrMod : MelonMod
         _motion.RestoreWeapon();
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
         _frameRateCounter.Update(_config.ShowFrameRate.Value);
-        ApplyLodDistance(_runtime != null && _runtime.IsRendering ? _config.ViewDistance.Value : 1f);
+        _colorGrading.Apply(_runtime != null && _runtime.IsRendering ? _config.ColorPreset.Value : ColorPreset.Off);
+        // Render scale applies right away, whichever way it was changed (menu, settings file, test scenario).
+        if (_runtime != null && _runtime.IsRendering && !Mathf.Approximately(XRSettings.eyeTextureResolutionScale, _config.ClampedRenderScale))
+            XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
+        _crosshairHider.Update(_runtime != null && _runtime.IsRendering && !_config.ShowCrosshair.Value);
+        ApplyLodDistance(_runtime != null && _runtime.IsRendering ? _config.ClampedViewDistance : 1f);
         // After the restore, so scenario checks see the game's own camera rather than the headset view.
         _scenario?.Update();
+        UpdatePhysicalGamepads();
         HandleHotkeys();
         UpdateControllers();
         if (_runtime != null && _runtime.IsRendering)
@@ -139,6 +151,17 @@ public sealed class JumpSpaceVrMod : MelonMod
         }
     }
 
+    /// <summary>One-click settings for mid-range cards (for example an RTX 4060/5060): every big cost turned down.</summary>
+    private void ApplyLowEndPreset()
+    {
+        _config.GraphicsQuality.Value = VrGraphicsQuality.Low;
+        _config.Dlss.Value = DlssMode.Performance;
+        _config.RenderScale.Value = 1.0f;
+        _config.ViewDistance.Value = 0.75f;
+        MelonPreferences.Save();
+        Log.Msg("Applied the slower graphics card preset (Low graphics, DLSS Performance, render scale 1.0, view distance 0.75).");
+    }
+
     private void ResetAllSettings()
     {
         _config.ResetAll();
@@ -150,6 +173,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private void BuildModMenu()
     {
         _modMenu.AddChoice("UI follow mode", _config.UiFollow, _ => _snapPanelToHead = true);
+        _modMenu.AddToggle("Curved UI", _config.CurvedUi);
+        _modMenu.AddNumber("Helmet HUD size (m)", _config.HelmetUiWidth, 0.05f, 0.6f, 2.4f, "0.00");
         _modMenu.AddNumber("UI smoothing (s)", _config.UiSmoothing, 0.02f, 0f, 1f, "0.00");
         _modMenu.AddNumber("UI size (m)", _config.UiWidth, 0.1f, 0.6f, 6f, "0.0");
         _modMenu.AddNumber("UI distance (m)", _config.UiDistance, 0.1f, 0.5f, 5f, "0.0");
@@ -161,9 +186,14 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
         _modMenu.AddNumber("View distance", _config.ViewDistance, 0.25f, 0.5f, 4f, "0.00x");
         _modMenu.AddToggle("Show frame rate", _config.ShowFrameRate);
+        _modMenu.AddToggle("Show crosshair", _config.ShowCrosshair);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
-        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
-            value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
+        _modMenu.AddAction("Preset: slower graphics card", ApplyLowEndPreset);
+        _modMenu.AddChoice("VR graphics", _config.GraphicsQuality);
+        _modMenu.AddChoice("DLSS (VR)", _config.Dlss);
+        _modMenu.AddChoice("Colour grading", _config.ColorPreset);
+        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 3f, "0.0");
+        _modMenu.AddChoice("Controls", _config.ControllerMode);
         _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
         _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
         _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
@@ -172,6 +202,10 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("Smooth turn speed", _config.SmoothTurnSpeed, 15f, 30f, 360f, "0");
         _modMenu.AddToggle("Weapon in hand", _config.WeaponInHand);
         _modMenu.AddChoice("Aim down sights with eye", _config.AimEye);
+        _modMenu.AddNumber("Left hand roll (degrees)", _config.LeftHandRoll, 15f, -180f, 180f, "0");
+        _modMenu.AddToggle("Head-tracked audio", _config.HeadTrackedAudio);
+        _modMenu.AddToggle("Controller vibration", _config.Haptics);
+        _modMenu.AddNumber("Vibration strength", _config.HapticStrength, 0.1f, 0f, 1f, "0.0");
         _modMenu.AddNumber("Weapon offset X (right)", _config.WeaponOffsetX, 0.01f, -0.5f, 0.5f, "0.00");
         _modMenu.AddNumber("Weapon offset Y (up)", _config.WeaponOffsetY, 0.01f, -0.6f, 0.4f, "0.00");
         _modMenu.AddNumber("Weapon offset Z (forward)", _config.WeaponOffsetZ, 0.01f, -0.3f, 0.8f, "0.00");
@@ -179,6 +213,31 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddAction("Recenter view", () => _recenterPending = true);
         _modMenu.AddAction("Close", () => _modMenu.Close());
         _modMenu.AddConfirmedAction("Reset all settings", ResetAllSettings);
+    }
+
+    /// <summary>
+    /// Real gamepads: decides whether one is in use (see <see cref="ControllerMode"/>), and handles its shortcuts and
+    /// fire rumble. Runs whether or not the VR controllers feed the game.
+    /// </summary>
+    private void UpdatePhysicalGamepads()
+    {
+        _testPad?.Update();
+        var rendering = _runtime != null && _runtime.IsRendering;
+        var wasActive = _pads.GamepadActive;
+        _pads.Update(rendering ? _config.ControllerMode.Value : ControllerMode.MotionControllers, _rawControllerState);
+        if (_pads.GamepadActive != wasActive)
+            Log.Msg(_pads.GamepadActive ? $"Gamepad in use: {_pads.Current?.displayName ?? "gamepad"}." : "VR controllers in use.");
+        if (!rendering)
+        {
+            _pads.StopRumble();
+            return;
+        }
+        if (_pads.RecenterRequested)
+            _recenterPending = true;
+        if (_pads.MenuToggleRequested)
+            _modMenu.Toggle();
+        _pads.UpdateFireRumble(_config.Haptics.Value, _config.HapticStrength.Value,
+            firing: _pads.GamepadActive && !_modMenu.IsOpen && IsInLevel() && _motion.HoldsItem);
     }
 
     /// <summary>Hold the right thumbstick click for a second to open or close the mod menu.</summary>
@@ -225,7 +284,12 @@ public sealed class JumpSpaceVrMod : MelonMod
     private void UpdateControllers()
     {
         if (!_vrRequested || _runtime == null || !_runtime.IsRendering || !_config.ControllersAsGamepad.Value)
+        {
+            // No fresh controller input this frame: don't let the menu or tests act on a stale held stick.
+            _lastControllerState = default;
+            _rawControllerState = default;
             return;
+        }
 
         if (_config.MockControllerInput.Value || _scenario != null)
             _mockInput.Apply();
@@ -254,6 +318,21 @@ public sealed class JumpSpaceVrMod : MelonMod
             }
             _mouse.Send(_pointerScreen.Value, state.RightTrigger > 0.5f);
             state.RightTrigger = 0f;
+        }
+
+        // Fire only counts in gameplay with something in hand (not while the laser clicks UI or the menu is open).
+        _haptics.Update(_runtime.Controllers, _rawControllerState, _config.Haptics.Value, _config.HapticStrength.Value,
+            firing: !_pointerScreen.HasValue && !_modMenu.IsOpen && IsInLevel() && _motion.HoldsItem,
+            laserClick: _pointerScreen.HasValue, twoHanded: _motion.Arms.TwoHanded);
+
+        if (_pads.GamepadActive)
+        {
+            // A real gamepad drives the game directly: no motion aim, so the view follows the game camera, and the
+            // virtual gamepad stays released so it doesn't fight the real one.
+            _motion.ProcessInput(ref state, false, _config.TurnMode.Value, _config.SnapTurnAngle.Value, _config.SmoothTurnSpeed.Value);
+            _lastControllerState = state;
+            _gamepad.Send(new ControllerState { IsActive = state.IsActive });
+            return;
         }
 
         // The left grip grabs the weapon's fore-end; don't also press the game's shoulder button with it.
@@ -298,9 +377,25 @@ public sealed class JumpSpaceVrMod : MelonMod
         return name switch
         {
             "fps" => Diagnostics.AverageFps,
+            "eyeWidth" => XRSettings.eyeTextureWidth,
+            "headAudioUpdates" => Tracking.HeadAudio.Updates,
+            "colorGradingOn" => GameObject.Find("JumpSpaceVR_ColorGrading")?.GetComponent<UnityEngine.Rendering.Volume>() is { } volume && volume.enabled ? 1f : 0f,
+            "hapticPulses" => _runtime?.Controllers.HapticPulses ?? 0,
+            "gamepadActive" => _pads.GamepadActive ? 1f : 0f,
+            // How far the view's yaw is from the game camera's (motion aim turns the camera, not the view).
+            "viewYawOffset" => Camera.main != null
+                ? Mathf.DeltaAngle(_cameraRig.ViewRotation.eulerAngles.y, Camera.main.transform.eulerAngles.y)
+                : null,
+            "padRumbles" => _pads.RumblePulses,
+            "eyeVolumetrics" => _cameraRig.LeftEye != null &&
+                _cameraRig.LeftEye.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>() is { } eyeData &&
+                eyeData.m_RenderingPathCustomFrameSettings.IsEnabled(UnityEngine.Rendering.HighDefinition.FrameSettingsField.Volumetrics) ? 1f : 0f,
+            "dlssRunning" => _cameraRig.DlssRunning ? 1f : 0f,
             "eyeFarClip" => _cameraRig.RightEye != null ? _cameraRig.RightEye.farClipPlane : null,
             "lodBias" => QualitySettings.lodBias,
             "sightShiftCm" => _lastSightShift.magnitude * 100f,
+            "crosshairVisible" => GameObject.Find("PF_GUI/FullScreenGUI/PF_FirstPersonHUD/Crosshairs") is { } crosshairs &&
+                crosshairs.transform.localScale.sqrMagnitude > 0f ? 1f : 0f,
             "frameRateShown" => GameObject.Find("JumpSpaceVR_FrameRate") != null ? 1f : 0f,
             "memoryMb" => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024f * 1024f),
             "eyeJolt" => _eyeHeights.MaxSpeedChange * 100f,
@@ -324,6 +419,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "canGrab" => _motion.Arms.CanGrab ? 1f : 0f,
             "rightHandErrorCm" => _motion.Arms.RightHandError * 100f,
             "leftHandErrorCm" => _motion.Arms.LeftHandError * 100f,
+            "aimHookActive" => MotionControls.IsHookedInstance(_motion) ? 1f : 0f,
             "holdsItem" => _motion.HoldsItem ? 1f : 0f,
             "weaponInHand" => _motion.WeaponInHand ? 1f : 0f,
             "itemLocator" => _motion.HasItemLocator ? 1f : 0f,
@@ -341,6 +437,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "virtualMouseX" => _mouse.DevicePosition.x,
             "virtualMouseLeft" => _mouse.DeviceLeftPressed ? 1f : 0f,
             "pointerActive" => _pointerScreen.HasValue ? 1f : 0f,
+            "panelYaw" => _uiCompositor.PanelYaw,
             "laserU" => _uiCompositor.CursorUv?.x,
             "laserV" => _uiCompositor.CursorUv?.y,
             "gamepadLeftX" => _lastControllerState.LeftStick.x,
@@ -406,6 +503,11 @@ public sealed class JumpSpaceVrMod : MelonMod
                 var parts = command.Split(' ', 3);
                 if (parts.Length == 3 && parts[0] == "config")
                     _config.SetTemporarily(parts[1], parts[2]);
+                else if (parts.Length == 3 && parts[0] == "pad")
+                {
+                    var values = parts[2].Split(' ');
+                    (_testPad ??= new Testing.TestGamepad()).Set(parts[1], values[0], values.Length > 1 ? values[1] : "0");
+                }
                 else
                     throw new ArgumentException($"unknown command '{command}'");
                 break;
@@ -458,6 +560,9 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         if (Mathf.Approximately(scale, _appliedLodScale))
             return;
+        // If the game changed its own setting meanwhile (graphics menu), take that as the new base.
+        if (_gameLodBias.HasValue && !Mathf.Approximately(QualitySettings.lodBias, _gameLodBias.Value * _appliedLodScale))
+            _gameLodBias = QualitySettings.lodBias / _appliedLodScale;
         _gameLodBias ??= QualitySettings.lodBias;
         QualitySettings.lodBias = _gameLodBias.Value * scale;
         _appliedLodScale = scale;
@@ -473,7 +578,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     /// </summary>
     private Vector3 SightShift()
     {
-        var aiming = _rawControllerState.LeftTrigger > 0.5f ? 1f : 0f;
+        var aimTrigger = _pads.GamepadActive ? _pads.LeftTrigger : _rawControllerState.LeftTrigger;
+        var aiming = aimTrigger > 0.5f ? 1f : 0f;
         _aimDownSights = Mathf.MoveTowards(_aimDownSights, aiming, Time.unscaledDeltaTime / AimDownSightsBlendSeconds);
         _lastSightShift = Vector3.zero;
         if (_aimDownSights <= 0f || _config.AimEye.Value == AimEye.Center)
@@ -577,7 +683,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
         if (_hotkeys.WasPressed(_config.ModMenuKey.Value))
             _modMenu.Toggle();
-        _modMenu.Update(_hotkeys, _lastControllerState);
+        _modMenu.Update(_hotkeys, _pads.GamepadActive ? _pads.MenuInput() : _lastControllerState);
 
         if (_hotkeys.WasPressed(_config.SnapshotKey.Value))
             SaveSnapshots();
@@ -615,6 +721,9 @@ public sealed class JumpSpaceVrMod : MelonMod
             _runtime.QuietFailures = false;
 
             HookBeforeRender();
+            // Every time VR starts (also after F8 off/on), not only when the hooks are first installed.
+            _motion.Activate();
+            _headAudio.Activate();
             XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
             _recenterPending = true;
 
@@ -682,7 +791,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                               && StereoRenderer.InstallHooks(HarmonyInstance);
         FirstPersonRenderFix.InstallHooks(HarmonyInstance);
         MotionControls.InstallHooks(HarmonyInstance);
-        _motion.Activate();
+        Tracking.HeadAudio.InstallHooks(HarmonyInstance);
     }
 
 
@@ -722,18 +831,22 @@ public sealed class JumpSpaceVrMod : MelonMod
             }
             float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
 
+            _cameraRig.Dlss = _config.Dlss.Value;
+            _cameraRig.Quality = _config.GraphicsQuality.Value;
+            _headAudio.Enabled = _config.HeadTrackedAudio.Value;
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
-                    _config.ViewDistance.Value))
+                    _config.ClampedViewDistance))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
+                _headAudio.UpdateHeadPose(_cameraRig.LeftEye, _cameraRig.RightEye);
                 _eyeHeights.Add(_cameraRig.LeftEye.transform.position.y, Time.unscaledTime);
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;
                 _uiCompositor.PlacePanel(_cameraRig.GamePosition, _cameraRig.ViewRotation, headPosition, left.Rotation,
                     _config.UiFollow.Value, _config.UiSmoothing.Value, _config.UiDistance.Value, _config.UiWidth.Value,
-                    _snapPanelToHead);
+                    _snapPanelToHead, _config.CurvedUi.Value, _config.HelmetUiWidth.Value);
                 _snapPanelToHead = false;
                 var roomscaleStep = _roomscale.ConsumeCharacterStep(_cameraRig.GamePosition, _cameraRig.ViewRotation);
                 if (roomscaleStep != Vector3.zero)
@@ -742,13 +855,15 @@ public sealed class JumpSpaceVrMod : MelonMod
                 var controllers = _lastControllerState;
                 var laserPointer = _headTracker.Localize(controllers.RightPointer, positional);
                 laserPointer.Rotation *= MotionControls.DebugPointerRotation;
-                UpdateLaserPointer(laserPointer);
+                // No laser while a gamepad is in use: the motion controllers are put down.
+                UpdateLaserPointer(_pads.GamepadActive ? default : laserPointer);
                 _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
                     _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
-                    _headTracker.Localize(controllers.LeftHand, positional), _rawControllerState.LeftGrip,
+                    _headTracker.Localize(controllers.LeftHand, positional), _headTracker.Localize(controllers.LeftPointer, positional),
+                    _rawControllerState.LeftGrip,
                     _config.WorldScale.Value,
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
-                    _config.WeaponInHand.Value, SightShift());
+                    _config.WeaponInHand.Value, SightShift(), _config.LeftHandRoll.Value);
             }
         }
         catch (Exception exception)

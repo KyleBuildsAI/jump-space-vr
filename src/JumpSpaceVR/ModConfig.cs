@@ -32,6 +32,16 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<Controls.AimEye> AimEye { get; }
     public MelonPreferences_Entry<float> ViewDistance { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
+    public MelonPreferences_Entry<bool> ShowCrosshair { get; }
+    public MelonPreferences_Entry<bool> CurvedUi { get; }
+    public MelonPreferences_Entry<float> HelmetUiWidth { get; }
+    public MelonPreferences_Entry<float> LeftHandRoll { get; }
+    public MelonPreferences_Entry<bool> HeadTrackedAudio { get; }
+    public MelonPreferences_Entry<bool> Haptics { get; }
+    public MelonPreferences_Entry<Rendering.ColorPreset> ColorPreset { get; }
+    public MelonPreferences_Entry<float> HapticStrength { get; }
+    public MelonPreferences_Entry<Rendering.DlssMode> Dlss { get; }
+    public MelonPreferences_Entry<Rendering.VrGraphicsQuality> GraphicsQuality { get; }
     public MelonPreferences_Entry<bool> MotionControls { get; }
     public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
     public MelonPreferences_Entry<float> SnapTurnAngle { get; }
@@ -51,6 +61,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<OpenXR.RuntimePreference> Runtime { get; }
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
     public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
+    public MelonPreferences_Entry<Controls.ControllerMode> ControllerMode { get; }
     public MelonPreferences_Entry<bool> SyntheticControllers { get; }
     public MelonPreferences_Entry<bool> DebugAimOffset { get; }
     public MelonPreferences_Entry<string> ScenarioFile { get; }
@@ -106,6 +117,25 @@ internal sealed class ModConfig
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
         ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
             "Multiplies how far the game draws (far clip plane and level of detail). Higher costs frame rate.");
+        GraphicsQuality = _category.CreateEntry("GraphicsQuality", Rendering.VrGraphicsQuality.Game, "VR graphics",
+            "Game keeps the game's settings; High, Medium and Low switch off progressively more expensive effects for both eyes.");
+        Dlss = _category.CreateEntry("Dlss", Rendering.DlssMode.Game, "DLSS (VR)",
+            "NVIDIA DLSS for both eyes: Game follows the game's graphics settings; Quality/Balanced/Performance force it on.");
+        HelmetUiWidth = _category.CreateEntry("HelmetUiWidth", 1.3f, "Helmet HUD size (m)",
+            "Width of the Helmet display (it sits 0.9 m in front of your eyes).");
+        LeftHandRoll = _category.CreateEntry("LeftHandRoll", 90f, "Left hand roll (degrees)",
+            "Turns the free left hand around your controller's pointing direction, for a natural rest pose.");
+        ColorPreset = _category.CreateEntry("ColorPreset", Rendering.ColorPreset.Off, "Colour grading",
+            "Colour grading preset on top of the game's look: Off, Vivid, Cinematic, ColdSpace, Warm, Bright, Noir.");
+        Haptics = _category.CreateEntry("Haptics", true, "Controller vibration",
+            "Vibrate the controllers when firing, grabbing the gun with both hands and clicking menus.");
+        HapticStrength = _category.CreateEntry("HapticStrength", 0.7f, "Vibration strength", "0 to 1.");
+        HeadTrackedAudio = _category.CreateEntry("HeadTrackedAudio", true, "Head-tracked audio",
+            "Sound follows your head: turning your head turns what you hear (the game's listener otherwise follows its camera).");
+        CurvedUi = _category.CreateEntry("CurvedUi", false, "Curved UI",
+            "Bend the UI panel around you (easier to read at the edges). The Helmet follow mode is always curved.");
+        ShowCrosshair = _category.CreateEntry("ShowCrosshair", false, "Show crosshair",
+            "Show the game's crosshair on the VR UI panel (it doesn't line up with a gun aimed by hand).");
         ShowFrameRate = _category.CreateEntry("ShowFrameRate", false, "Show frame rate",
             "Show the current frame rate in the corner of the UI panel.");
         HideCinematicBars = _category.CreateEntry("HideCinematicBars", true, "Hide cinematic bars",
@@ -113,7 +143,7 @@ internal sealed class ModConfig
         RoomscaleWalking = _category.CreateEntry("RoomscaleWalking", false, "Room-scale walking",
             "Experimental: when you physically step away from your character, the character walks after you.");
         RenderScale = _category.CreateEntry("RenderScale", 1.0f, "Render scale",
-            "Eye texture resolution multiplier (0.5 - 2.0). Lower it for performance.");
+            "Eye texture resolution multiplier (0.5 - 3.0). Lower it for performance.");
         SinglePassInstanced = _category.CreateEntry("SinglePassInstanced", false, "Single pass instanced",
             "Experimental. Faster, but the game's shaders may not support it (black or one-eye rendering).");
         MoveUiIntoVr = _category.CreateEntry("MoveUiIntoVr", true, "Move UI into VR",
@@ -132,6 +162,10 @@ internal sealed class ModConfig
         ControllersAsGamepad = _category.CreateEntry("ControllersAsGamepad", true, "VR controllers as gamepad",
             "Play with VR controllers: sticks, triggers, grips (bumpers) and face buttons act like an Xbox controller. " +
             "Click both thumbsticks to recenter.");
+        ControllerMode = _category.CreateEntry("ControllerMode", Controls.ControllerMode.Auto, "Controls",
+            "Auto: whatever you used last, VR controllers or a gamepad (Xbox, PlayStation, Switch Pro, Steam Input). " +
+            "MotionControllers or Gamepad: always that one. With a gamepad the view follows the game camera and the " +
+            "pad aims; hold View/Select (Share/Create on PlayStation) for a second for the VR menu, click both sticks to recenter.");
         SyntheticControllers = _category.CreateEntry("SyntheticControllers", false, "Synthetic controllers",
             "Developer option: feed a fixed test input through the virtual gamepad when no controllers are active.");
         MockControllerInput = _category.CreateEntry("MockControllerInput", false, "Mock controller input",
@@ -153,7 +187,9 @@ internal sealed class ModConfig
         _category.SaveToFile(false);
     }
 
-    public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 2.0f);
+    public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 3.0f);
+
+    public float ClampedViewDistance => Mathf.Clamp(ViewDistance.Value, 0.5f, 4f);
 
     private readonly Dictionary<string, object> _temporaryOriginals = new();
 

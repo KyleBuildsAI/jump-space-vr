@@ -15,6 +15,8 @@ internal enum UiFollowMode
     Lazy,
     /// <summary>Follows your face (yaw and pitch) with adjustable smoothing; zero smoothing is head-locked.</summary>
     Smooth,
+    /// <summary>A visor display inside the helmet: locked to the head, close, wide and curved.</summary>
+    Helmet,
 }
 
 /// <summary>
@@ -36,6 +38,13 @@ internal sealed class UiCompositor
     private Mesh _panelMesh;
     private CommandBuffer _uiCommands;
     private Matrix4x4 _panelMatrix = Matrix4x4.identity;
+    private Matrix4x4 _panelFrame = Matrix4x4.identity;
+    private Vector2 _panelSize = Vector2.one;
+    // Curved panel: cylinder radius in meters around the viewer (0 = flat), and the mesh built for it.
+    private float _curveRadius;
+    private Mesh _curvedMesh;
+    private float _curvedMeshRadius;
+    private Vector2 _curvedMeshSize;
     private Material _cursorMaterial;
     private const float CursorDiameter = 0.018f;
 
@@ -51,6 +60,8 @@ internal sealed class UiCompositor
         uv = default;
         if (!_running || !PanelEnabled)
             return false;
+        if (_curveRadius > 0f)
+            return TryHitCurvedPanel(origin, direction, out uv);
 
         var inverse = _panelMatrix.inverse;
         var localOrigin = inverse.MultiplyPoint3x4(origin);
@@ -66,11 +77,47 @@ internal sealed class UiCompositor
         uv = new Vector2(hit.x + 0.5f, hit.y + 0.5f);
         return true;
     }
+
+    /// <summary>
+    /// Curved panel: a section of a vertical cylinder whose axis passes through the viewer (radius = panel distance),
+    /// intersected in the panel's unscaled frame. The hit on the far side of the cylinder is the one in front.
+    /// </summary>
+    private bool TryHitCurvedPanel(Vector3 origin, Vector3 direction, out Vector2 uv)
+    {
+        uv = default;
+        var inverse = _panelFrame.inverse;
+        var localOrigin = inverse.MultiplyPoint3x4(origin);
+        var localDirection = inverse.MultiplyVector(direction).normalized;
+        var axisX = localOrigin.x;
+        var axisZ = localOrigin.z + _curveRadius;
+        var a = localDirection.x * localDirection.x + localDirection.z * localDirection.z;
+        if (a < 1e-8f)
+            return false;
+        var b = 2f * (axisX * localDirection.x + axisZ * localDirection.z);
+        var c = axisX * axisX + axisZ * axisZ - _curveRadius * _curveRadius;
+        var discriminant = b * b - 4f * a * c;
+        if (discriminant < 0f)
+            return false;
+        var distance = (-b + Mathf.Sqrt(discriminant)) / (2f * a);
+        if (distance <= 0f)
+            return false;
+        var hit = localOrigin + localDirection * distance;
+        var angle = Mathf.Atan2(hit.x, hit.z + _curveRadius);
+        var u = angle * _curveRadius / _panelSize.x + 0.5f;
+        var v = hit.y / _panelSize.y + 0.5f;
+        if (u < 0f || u > 1f || v < 0f || v > 1f)
+            return false;
+        uv = new Vector2(u, v);
+        return true;
+    }
     private bool _hasUiFrame;
     private bool _running;
     private object _coroutine;
 
     public bool PanelEnabled { get; set; } = true;
+
+    /// <summary>The panel's yaw relative to the body (degrees), for tests.</summary>
+    public float PanelYaw => Mathf.DeltaAngle(0f, _panelRotation.eulerAngles.y);
     public RenderTexture UiTexture => _uiTexture;
     public RenderTexture MirrorSource { get; set; }
 
@@ -89,10 +136,20 @@ internal sealed class UiCompositor
     /// panel travels with the player's body; the mode decides how it follows the head.
     /// </summary>
     public void PlacePanel(Vector3 viewOrigin, Quaternion viewRotation, Vector3 headPosition, Quaternion headRotation,
-        UiFollowMode mode, float smoothingSeconds, float distance, float width, bool snapToHead)
+        UiFollowMode mode, float smoothingSeconds, float distance, float width, bool snapToHead, bool curved,
+        float helmetWidth)
     {
+        if (mode == UiFollowMode.Helmet)
+        {
+            // Visor display: always in front of the eyes, lagging a little so it feels mounted in the helmet.
+            distance = HelmetDistance;
+            width = helmetWidth;
+            smoothingSeconds = HelmetLagSeconds;
+            curved = true;
+        }
+
         var headYawOnly = Quaternion.Euler(0f, headRotation.eulerAngles.y, 0f);
-        var target = mode == UiFollowMode.Smooth ? headRotation : headYawOnly;
+        var target = mode is UiFollowMode.Smooth or UiFollowMode.Helmet ? headRotation : headYawOnly;
 
         if (!_hasPanelPose || snapToHead)
         {
@@ -120,6 +177,7 @@ internal sealed class UiCompositor
                 break;
 
             case UiFollowMode.Smooth:
+            case UiFollowMode.Helmet:
                 _panelRotation = smoothingSeconds <= 0f
                     ? target
                     : Quaternion.Slerp(_panelRotation, target, Blend(smoothingSeconds, deltaTime));
@@ -131,11 +189,18 @@ internal sealed class UiCompositor
             ? _panelHeadPosition
             : Vector3.Lerp(_panelHeadPosition, headPosition, Blend(Mathf.Max(smoothingSeconds, 0.05f), deltaTime));
 
-        var localCenter = _panelHeadPosition + _panelRotation * new Vector3(0f, -PanelDrop, distance);
+        var drop = mode == UiFollowMode.Helmet ? 0f : PanelDrop;
+        var localCenter = _panelHeadPosition + _panelRotation * new Vector3(0f, -drop, distance);
         var aspect = Screen.width > 0 ? (float)Screen.height / Screen.width : 9f / 16f;
-        _panelMatrix = Matrix4x4.TRS(viewOrigin + viewRotation * localCenter, viewRotation * _panelRotation,
-            new Vector3(width, width * aspect, 1f));
+        _panelSize = new Vector2(width, width * aspect);
+        _panelFrame = Matrix4x4.TRS(viewOrigin + viewRotation * localCenter, viewRotation * _panelRotation, Vector3.one);
+        _panelMatrix = _panelFrame * Matrix4x4.Scale(new Vector3(_panelSize.x, _panelSize.y, 1f));
+        _curveRadius = curved ? distance : 0f;
     }
+
+    // Helmet display: about the closest distance that stays comfortable to focus on in a headset.
+    private const float HelmetDistance = 0.9f;
+    private const float HelmetLagSeconds = 0.04f;
 
     /// <summary>Frame-rate independent exponential smoothing factor.</summary>
     private static float Blend(float seconds, float deltaTime) => 1f - Mathf.Exp(-deltaTime / Mathf.Max(seconds, 0.0001f));
@@ -190,7 +255,10 @@ internal sealed class UiCompositor
                 continue;
             commands.SetRenderTarget(eyeTargets[eye]);
             commands.SetViewProjectionMatrices(camera.worldToCameraMatrix, camera.projectionMatrix);
-            commands.DrawMesh(_panelMesh, _panelMatrix, _panelMaterial, 0, 0);
+            if (_curveRadius > 0f)
+                commands.DrawMesh(CurvedMesh(), _panelFrame, _panelMaterial, 0, 0);
+            else
+                commands.DrawMesh(_panelMesh, _panelMatrix, _panelMaterial, 0, 0);
             if (CursorUv.HasValue && _cursorMaterial != null)
                 commands.DrawMesh(_panelMesh, CursorMatrix(CursorUv.Value), _cursorMaterial, 0, 0);
         }
@@ -277,10 +345,68 @@ internal sealed class UiCompositor
 
     private Matrix4x4 CursorMatrix(Vector2 uv)
     {
+        if (_curveRadius > 0f)
+        {
+            // On the cylinder, just in front of the panel, facing the viewer.
+            var angle = (uv.x - 0.5f) * _panelSize.x / _curveRadius;
+            var radius = _curveRadius - 0.002f;
+            var position = new Vector3(Mathf.Sin(angle) * radius, (uv.y - 0.5f) * _panelSize.y,
+                Mathf.Cos(angle) * radius - _curveRadius);
+            return _panelFrame * Matrix4x4.TRS(position, Quaternion.Euler(0f, angle * Mathf.Rad2Deg, 0f),
+                new Vector3(CursorDiameter, CursorDiameter, 1f));
+        }
+
         var scale = _panelMatrix.lossyScale;
         var local = Matrix4x4.TRS(new Vector3(uv.x - 0.5f, uv.y - 0.5f, -0.002f), Quaternion.identity,
             new Vector3(CursorDiameter / Mathf.Max(scale.x, 0.01f), CursorDiameter / Mathf.Max(scale.y, 0.01f), 1f));
         return _panelMatrix * local;
+    }
+
+    /// <summary>The panel bent onto a cylinder around the viewer, in the panel's unscaled frame (meters).</summary>
+    private Mesh CurvedMesh()
+    {
+        if (_curvedMesh != null && Mathf.Approximately(_curvedMeshRadius, _curveRadius) && _curvedMeshSize == _panelSize)
+            return _curvedMesh;
+
+        const int Columns = 32;
+        var vertices = new Vector3[(Columns + 1) * 2];
+        var uvs = new Vector2[vertices.Length];
+        var colors = new Color[vertices.Length];
+        var triangles = new int[Columns * 6];
+        for (var column = 0; column <= Columns; column++)
+        {
+            var u = (float)column / Columns;
+            var angle = (u - 0.5f) * _panelSize.x / _curveRadius;
+            var x = Mathf.Sin(angle) * _curveRadius;
+            var z = Mathf.Cos(angle) * _curveRadius - _curveRadius;
+            vertices[column * 2] = new Vector3(x, -_panelSize.y / 2f, z);
+            vertices[column * 2 + 1] = new Vector3(x, _panelSize.y / 2f, z);
+            uvs[column * 2] = new Vector2(u, 0f);
+            uvs[column * 2 + 1] = new Vector2(u, 1f);
+            colors[column * 2] = Color.white;
+            colors[column * 2 + 1] = Color.white;
+            if (column == Columns)
+                continue;
+            var index = column * 6;
+            var bottom = column * 2;
+            triangles[index] = bottom;
+            triangles[index + 1] = bottom + 1;
+            triangles[index + 2] = bottom + 2;
+            triangles[index + 3] = bottom + 1;
+            triangles[index + 4] = bottom + 3;
+            triangles[index + 5] = bottom + 2;
+        }
+
+        _curvedMesh ??= new Mesh { name = "JumpSpaceVR_UiPanelCurved", hideFlags = HideFlags.DontUnloadUnusedAsset };
+        _curvedMesh.Clear();
+        _curvedMesh.vertices = new Il2CppStructArray<Vector3>(vertices);
+        _curvedMesh.uv = new Il2CppStructArray<Vector2>(uvs);
+        _curvedMesh.colors = new Il2CppStructArray<Color>(colors);
+        _curvedMesh.triangles = new Il2CppStructArray<int>(triangles);
+        _curvedMesh.RecalculateBounds();
+        _curvedMeshRadius = _curveRadius;
+        _curvedMeshSize = _panelSize;
+        return _curvedMesh;
     }
 
     /// <summary>A soft white dot with a dark outline, readable on any background.</summary>

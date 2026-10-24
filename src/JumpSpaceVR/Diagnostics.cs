@@ -203,6 +203,17 @@ internal static partial class Diagnostics
                               $"camera={(canvas.worldCamera != null ? canvas.worldCamera.name : "-")} order={canvas.sortingOrder} layer={canvas.gameObject.layer} display={canvas.targetDisplay} alpha={CanvasAlpha(canvas):F2}");
         }
 
+        // Crosshair and hit-marker candidates (they sit in the middle of the VR panel).
+        report.AppendLine("-- Crosshair-like UI --");
+        foreach (var graphic in Object.FindObjectsByType<UnityEngine.UI.Graphic>(FindObjectsSortMode.None))
+        {
+            if (!graphic.isActiveAndEnabled)
+                continue;
+            var path = PathOf(graphic.transform);
+            if (System.Text.RegularExpressions.Regex.IsMatch(path, "(?i)cross|retic|hitmark|spread|aimdot|centerdot"))
+                report.AppendLine($"  {path} color={graphic.color}");
+        }
+
         // Wide, dark, opaque UI graphics: letterbox bars and fades that would cover the view on the VR panel.
         report.AppendLine("-- Large opaque UI graphics --");
         foreach (var graphic in Object.FindObjectsByType<UnityEngine.UI.Graphic>(FindObjectsSortMode.None))
@@ -242,7 +253,7 @@ internal static partial class Diagnostics
         if (hdData != null)
         {
             names.Append($"| volumeMask=0x{hdData.volumeLayerMask.value:X8} anchor={(hdData.volumeAnchorOverride != null ? hdData.volumeAnchorOverride.name : "-")} " +
-                         $"aa={hdData.antialiasing} customFrameSettings={hdData.customRenderingSettings} dynRes={hdData.allowDynamicResolution}");
+                         $"aa={hdData.antialiasing} dlss={hdData.allowDeepLearningSuperSampling}/{hdData.cameraCanRenderDLSS} customFrameSettings={hdData.customRenderingSettings} dynRes={hdData.allowDynamicResolution}");
         }
         return names.ToString();
     }

@@ -5,8 +5,21 @@ A PC VR mod for [Jump Space](https://store.steampowered.com/app/1757300/Jump_Spa
 
 It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR and others.
 
-> Status: early. Rendering, head tracking, the UI panel, controllers and the desktop mirror are implemented and
-> tested against Unity's OpenXR mock runtime. Expect rough edges in specific game screens.
+## Download
+
+### [⬇ Download Jump Space VR (latest)](https://github.com/KyleBuildsAI/jump-space-vr/releases/latest/download/JumpSpaceVR.zip)
+
+1. Download the zip above and extract it anywhere (right-click > **Extract All**).
+2. Close Jump Space, then double-click **`Install.bat`**. It finds the game and sets everything up.
+3. Start your VR app (SteamVR / Steam Link, Virtual Desktop or Meta Quest Link), then launch Jump Space from Steam.
+   The first launch takes a few extra minutes; VR starts by itself.
+
+Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
+[Releases](https://github.com/KyleBuildsAI/jump-space-vr/releases). `QUICKSTART.txt` in the zip has the controls.
+
+> Status: early access, like the game. Played on a Quest 3 over Steam Link and tested headlessly against Unity's
+> OpenXR mock runtime. Expect rough edges in specific game screens; please report them in
+> [Issues](https://github.com/KyleBuildsAI/jump-space-vr/issues) with your `MelonLoader/Latest.log`.
 
 ## Features
 
@@ -26,10 +39,23 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
   - Grips map to LB/RB.
   - A/B/X/Y map to A/B/X/Y.
   - The left menu button maps to Start.
+- **Real gamepads too.** Xbox, PlayStation (DualSense, DualShock 4), Switch Pro and anything Steam Input presents as
+  a gamepad. Pick one up and the mod switches to it: the view follows the game camera, the pad aims and the motion
+  controllers step aside; touch the VR controllers again and they take over. Firing rumbles the pad, the left trigger
+  lines the sights up with your aiming eye, and hold View/Select (Share/Create on PlayStation) for 1 s for the VR
+  menu. Set `ControllerMode` to always use one or the other.
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
   controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal.
 - **Mod menu (Insert).** An in-headset settings menu. It covers UI follow mode and size, comfort options, turning,
   motion controls and weapon offsets.
+- **UI styles.** A flat or curved panel that stays put, eases after you, or follows your face, or a **Helmet**
+  display: the HUD sits on your visor (head-locked, wide and curved, slightly lagging like a helmet HUD).
+- **Two-handed guns.** With "Weapon in hand" on, bring your left hand to the gun's fore-end (two blue rings show
+  where) and hold grip to steady and aim the gun with both hands.
+- **Feel.** Head-tracked game audio, controller vibration, colour grading presets.
+- **Performance controls.** VR graphics levels and a one-click preset for mid-range cards.
+- **DLSS in VR.** The game's built-in NVIDIA DLSS can be forced on for both eyes, for sharper edges or more frame
+  rate at high render scales.
 - **Comfort.**
   - Head bob, recoil kick and knockback shake are removed from your view.
   - The game never pitches or rolls the horizon.
@@ -48,8 +74,7 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
 
 ## Install
 
-**From a release zip (no .NET SDK needed):** extract `JumpSpaceVR-<version>.zip`, close the game and double-click
-`Install.bat`. Then continue at step 4 below.
+**From a release zip (no .NET SDK needed):** see [Download](#download) above. Then continue at step 4 below.
 
 **From source:**
 
@@ -86,6 +111,16 @@ update if VR stops working.
 
 Mouse, keyboard and gamepads keep working while you play in VR.
 
+With a gamepad (Xbox, PlayStation, Switch Pro, Steam Input):
+
+| Pad | Action |
+| --- | --- |
+| Everything | The game's own gamepad controls (the right stick looks, the view follows the game camera) |
+| Hold View/Select (PlayStation: Share/Create) for 1 s | Open/close the VR menu (left stick or d-pad to navigate, A/Cross to change, B/Circle to close) |
+| Click both sticks | Recenter |
+| Left trigger | Aim down sights; the weapon lines up with your aiming eye |
+| Right trigger | Fire; the pad rumbles (turn off with "Controller vibration") |
+
 Controller layout with motion controls on (default):
 
 | Controller | Action |
@@ -108,13 +143,23 @@ launch with the mod.
 | `StartInVr` | `true` | Start VR automatically once the game has loaded. |
 | `PositionalTracking` | `true` | 6DoF. Set to `false` for rotation-only tracking. |
 | `WorldScale` | `1.0` | Scales your head movement. |
-| `RenderScale` | `1.0` | Eye resolution multiplier (0.5–2.0). Lower it for performance. |
+| `RenderScale` | `1.0` | Eye resolution multiplier (0.5–3.0). Lower it for performance; combine high values with DLSS. |
 | `MoveUiIntoVr` | `true` | Show the UI panel in the headset. |
 | `UiDistance` / `UiWidth` | `1.6` / `1.9` | UI panel distance and width, in meters. |
 | `ControllersAsGamepad` | `true` | Use VR controllers as a gamepad. |
+| `ControllerMode` | `Auto` | `Auto` uses whatever you touched last (VR controllers or a gamepad); `MotionControllers` or `Gamepad` always uses that one. |
 | `AimEye` | `Right` | While aiming down sights (left trigger), line the sights up with this eye: `Right`, `Left` or `Center`. |
 | `ViewDistance` | `1.0` | Draw distance multiplier (level of detail and far clip), 0.5–4. Higher costs frame rate. |
 | `ShowFrameRate` | `false` | Show the frame rate in the top-left of the UI panel. |
+| `GraphicsQuality` | `Game` | VR graphics: `Game` keeps the game's settings; `High` drops motion blur, depth of field and lens effects; `Medium` also SSR/SSGI, contact shadows, volumetric clouds; `Low` also volumetric fog, ambient occlusion, refraction. The menu also has **Preset: slower graphics card** (Low, DLSS Performance, render scale 1.0, view distance 0.75). |
+| `ColorPreset` | `Off` | Colour grading on top of the game's look: `Vivid`, `Cinematic`, `ColdSpace`, `Warm`, `Bright`, `Noir`. |
+| `Haptics` / `HapticStrength` | `true` / `0.7` | Controller vibration when firing (both hands when holding the gun two-handed), grabbing the fore-end and clicking menus. |
+| `HeadTrackedAudio` | `true` | Sound follows your head instead of the game camera. |
+| `HelmetUiWidth` | `1.3` | Width of the Helmet display (m). |
+| `LeftHandRoll` | `90` | Turns the free left hand for a natural rest pose (try -90 if it looks backwards). |
+| `Dlss` | `Game` | NVIDIA DLSS for both eyes: `Game` follows the game's graphics option; `Off`, `Quality`, `Balanced`, `Performance`, `UltraPerformance` force it. At high render scales `Performance` gave about +20% frame rate in testing. |
+| `CurvedUi` | `false` | Bend the UI panel around you. |
+| `ShowCrosshair` | `false` | Show the game's crosshair on the UI panel (it doesn't line up with a gun aimed by hand). |
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
@@ -131,7 +176,9 @@ launch with the mod.
 - **Session report.** While VR runs, the mod writes a `[session]` line to `MelonLoader/Latest.log` every 5 minutes
   and when VR stops or the game closes: frame rate, worst frame, how much of the time controllers were tracked,
   trigger pulls and laser clicks, whether the weapon sat in your hand, and the worst view jolt. Include it in reports.
-- **Low frame rate.** Lower `RenderScale`. Each eye is a full HDRP render, so expect roughly twice the GPU cost of
+- **Low frame rate.** In the mod menu, use **Preset: slower graphics card**, or lower `RenderScale`, set `VR graphics`
+  to Medium/Low and DLSS to Performance. In SteamVR / Steam Link, a 72 or 90 Hz refresh rate is easier to hold than
+  120 Hz. Lower `RenderScale`. Each eye is a full HDRP render, so expect roughly twice the GPU cost of
   flat play.
 - **Anything else.** Run `scripts\uninstall.ps1 -GamePath "<game folder>"`, then use Steam's *Verify integrity of
   game files* to return to the unmodded game.
@@ -230,10 +277,15 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu; left stick navigates, A toggles a setting, B closes |
 | `vr-toggle.txt` (~1 min) | F8 turns VR off and on three times; the session restarts cleanly and hands, laser and weapon fix work afterwards |
 | `hangar-options.txt` (~2 min) | Enters the hangar (gun in hand): gun drawn by the eye cameras, sights move to the right eye while aiming, view distance, frame-rate counter |
+| `ui-modes.txt` (~1 min) | Curved panel still takes laser clicks; the helmet display follows the head |
+| `dlss.txt` (~2 min) | DLSS runs on both eye cameras when forced on (prints frame rate off / Quality / Performance at render scale 2) |
+| `feel-and-look.txt` (~2 min) | In the hangar: head-tracked audio updates, vibration on firing and grabbing, colour grading on/off |
+| `gamepad.txt` (~2 min) | In the hangar with a scripted gamepad: using it turns motion aim off and the view follows the camera; firing rumbles; left trigger shifts the sights; View held opens the menu; the VR controllers take over again; `Gamepad` mode keeps the pad |
+| `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
-`hand`, `input`, `key`, `keyuntil`, `expect`, `config` (changes a setting for that run only), `snapshot`,
+`hand`, `input`, `pad` (a scripted gamepad), `key`, `keyuntil`, `expect`, `config` (changes a setting for that run only), `snapshot`,
 `diagnostics`, `recenter`, `log` and `quit`. Metrics such as `cameraYaw`, `aimYawOffset`, `laserU`, `cutscene`, `fps`,
 `memoryMb`, `eyeJolt` and `setting.<Name>` (any mod setting) are defined in `JumpSpaceVrMod.ScenarioMetric`.
 
@@ -250,6 +302,11 @@ runtime, for example SteamVR's `steamxr_win64.json` with its null driver enabled
 with a simulated headset.
 
 `Jump Space VR mod research.md` contains the background feasibility research.
+
+## License
+
+MIT, see [LICENSE](LICENSE). This is a fan-made mod, not affiliated with or endorsed by Keepsake Games. It ships no
+game files.
 
 ## Third-party components
 
