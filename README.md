@@ -64,6 +64,8 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
 - **Feel.** Head-tracked game audio, controller vibration, colour grading presets.
 - **Performance controls.** VR graphics levels (which also shorten shadow distance), a shadow distance setting and a
   one-click preset for mid-range cards. VR in this game is mostly limited by the CPU, which draws everything once per eye.
+  At Low the mod also skips per-object motion vectors (about +10% frame rate; moving objects can smear slightly with
+  DLSS or TAA).
 - **DLSS in VR.** The game's built-in NVIDIA DLSS can be forced on for both eyes, for sharper edges or more frame
   rate at high render scales.
 - **Comfort.**
