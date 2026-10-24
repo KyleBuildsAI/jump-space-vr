@@ -29,6 +29,8 @@ internal struct ControllerState
     public bool ButtonX;
     public bool ButtonY;
     public bool Menu;
+    /// <summary>View/Select/Share (only real or test gamepads have it).</summary>
+    public bool View;
     public bool LeftStickClick;
     public bool RightStickClick;
 

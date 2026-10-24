@@ -26,6 +26,11 @@ It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR
   - Grips map to LB/RB.
   - A/B/X/Y map to A/B/X/Y.
   - The left menu button maps to Start.
+- **Real gamepads too.** Xbox, PlayStation (DualSense, DualShock 4), Switch Pro and anything Steam Input presents as
+  a gamepad. Pick one up and the mod switches to it: the view follows the game camera, the pad aims and the motion
+  controllers step aside; touch the VR controllers again and they take over. Firing rumbles the pad, the left trigger
+  lines the sights up with your aiming eye, and hold View/Select (Share/Create on PlayStation) for 1 s for the VR
+  menu. Set `ControllerMode` to always use one or the other.
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
   controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal.
 - **Mod menu (Insert).** An in-headset settings menu. It covers UI follow mode and size, comfort options, turning,
@@ -94,6 +99,16 @@ update if VR stops working.
 
 Mouse, keyboard and gamepads keep working while you play in VR.
 
+With a gamepad (Xbox, PlayStation, Switch Pro, Steam Input):
+
+| Pad | Action |
+| --- | --- |
+| Everything | The game's own gamepad controls (the right stick looks, the view follows the game camera) |
+| Hold View/Select (PlayStation: Share/Create) for 1 s | Open/close the VR menu (left stick or d-pad to navigate, A/Cross to change, B/Circle to close) |
+| Click both sticks | Recenter |
+| Left trigger | Aim down sights; the weapon lines up with your aiming eye |
+| Right trigger | Fire; the pad rumbles (turn off with "Controller vibration") |
+
 Controller layout with motion controls on (default):
 
 | Controller | Action |
@@ -120,6 +135,7 @@ launch with the mod.
 | `MoveUiIntoVr` | `true` | Show the UI panel in the headset. |
 | `UiDistance` / `UiWidth` | `1.6` / `1.9` | UI panel distance and width, in meters. |
 | `ControllersAsGamepad` | `true` | Use VR controllers as a gamepad. |
+| `ControllerMode` | `Auto` | `Auto` uses whatever you touched last (VR controllers or a gamepad); `MotionControllers` or `Gamepad` always uses that one. |
 | `AimEye` | `Right` | While aiming down sights (left trigger), line the sights up with this eye: `Right`, `Left` or `Center`. |
 | `ViewDistance` | `1.0` | Draw distance multiplier (level of detail and far clip), 0.5–4. Higher costs frame rate. |
 | `ShowFrameRate` | `false` | Show the frame rate in the top-left of the UI panel. |
@@ -252,11 +268,12 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `ui-modes.txt` (~1 min) | Curved panel still takes laser clicks; the helmet display follows the head |
 | `dlss.txt` (~2 min) | DLSS runs on both eye cameras when forced on (prints frame rate off / Quality / Performance at render scale 2) |
 | `feel-and-look.txt` (~2 min) | In the hangar: head-tracked audio updates, vibration on firing and grabbing, colour grading on/off |
+| `gamepad.txt` (~2 min) | In the hangar with a scripted gamepad: using it turns motion aim off and the view follows the camera; firing rumbles; left trigger shifts the sights; View held opens the menu; the VR controllers take over again; `Gamepad` mode keeps the pad |
 | `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
-`hand`, `input`, `key`, `keyuntil`, `expect`, `config` (changes a setting for that run only), `snapshot`,
+`hand`, `input`, `pad` (a scripted gamepad), `key`, `keyuntil`, `expect`, `config` (changes a setting for that run only), `snapshot`,
 `diagnostics`, `recenter`, `log` and `quit`. Metrics such as `cameraYaw`, `aimYawOffset`, `laserU`, `cutscene`, `fps`,
 `memoryMb`, `eyeJolt` and `setting.<Name>` (any mod setting) are defined in `JumpSpaceVrMod.ScenarioMetric`.
 

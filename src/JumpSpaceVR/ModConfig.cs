@@ -61,6 +61,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<OpenXR.RuntimePreference> Runtime { get; }
     public MelonPreferences_Entry<bool> SnapshotOnStartup { get; }
     public MelonPreferences_Entry<bool> ControllersAsGamepad { get; }
+    public MelonPreferences_Entry<Controls.ControllerMode> ControllerMode { get; }
     public MelonPreferences_Entry<bool> SyntheticControllers { get; }
     public MelonPreferences_Entry<bool> DebugAimOffset { get; }
     public MelonPreferences_Entry<string> ScenarioFile { get; }
@@ -161,6 +162,10 @@ internal sealed class ModConfig
         ControllersAsGamepad = _category.CreateEntry("ControllersAsGamepad", true, "VR controllers as gamepad",
             "Play with VR controllers: sticks, triggers, grips (bumpers) and face buttons act like an Xbox controller. " +
             "Click both thumbsticks to recenter.");
+        ControllerMode = _category.CreateEntry("ControllerMode", Controls.ControllerMode.Auto, "Controls",
+            "Auto: whatever you used last, VR controllers or a gamepad (Xbox, PlayStation, Switch Pro, Steam Input). " +
+            "MotionControllers or Gamepad: always that one. With a gamepad the view follows the game camera and the " +
+            "pad aims; hold View/Select (Share/Create on PlayStation) for a second for the VR menu, click both sticks to recenter.");
         SyntheticControllers = _category.CreateEntry("SyntheticControllers", false, "Synthetic controllers",
             "Developer option: feed a fixed test input through the virtual gamepad when no controllers are active.");
         MockControllerInput = _category.CreateEntry("MockControllerInput", false, "Mock controller input",

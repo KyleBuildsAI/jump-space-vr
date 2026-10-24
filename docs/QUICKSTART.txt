@@ -23,6 +23,10 @@ CONTROLS
   In menus ................ point at the screen and pull the trigger to click
 
   Insert (or hold right thumbstick click 1 s) ... VR settings menu
+
+  GAMEPAD (Xbox, PlayStation, Switch Pro): just pick it up, the mod switches to it.
+  The game's normal pad controls work; hold View/Select (PlayStation: Share/Create) 1 s for the VR menu;
+  click both sticks to recenter. Touch the VR controllers to switch back.
   F7 ... recenter     F8 ... VR on/off     F9 ... diagnostics     F10 ... save what the headset sees
 
 PROBLEMS?
