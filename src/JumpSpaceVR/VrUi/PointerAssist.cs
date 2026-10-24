@@ -31,6 +31,7 @@ internal sealed class PointerAssist
     private bool _hasSmoothed;
     private Vector2? _locked;
     private Selectable _snapped;
+    private Selectable _lastLogged;
 
     /// <summary>Clickable elements found at the last refresh (for tests).</summary>
     public int TargetCount => _targets.Count;
@@ -74,12 +75,8 @@ internal sealed class PointerAssist
 
     private Vector2 Snap(Vector2 point, float scale)
     {
-        // Stay on the current element until the laser moves clearly away, so it doesn't flicker between neighbours.
-        if (_snapped != null && TryRect(_snapped, out var current) && Distance(current, point) < ReleaseRadius * scale)
-            return Inside(current, point, scale);
-
-        _snapped = null;
-        var best = SnapRadius * scale;
+        Selectable nearest = null;
+        var best = float.MaxValue;
         Rect bestRect = default;
         foreach (var (selectable, rect, camera) in _targets)
         {
@@ -90,8 +87,21 @@ internal sealed class PointerAssist
             {
                 best = distance;
                 bestRect = screenRect;
-                _snapped = selectable;
+                nearest = selectable;
             }
+        }
+
+        // An element right under the laser always wins. In the gaps between elements, stay on the current one until
+        // the laser moves clearly away, so it doesn't flicker between neighbours. (Stickiness that beat the element
+        // under the laser kept a button the laser had only swept across while a menu animated in.)
+        if (best > 0f && _snapped != null && TryRect(_snapped, out var current) && Distance(current, point) < ReleaseRadius * scale)
+            return Inside(current, point, scale);
+
+        _snapped = best < SnapRadius * scale ? nearest : null;
+        if (_snapped != null && _snapped != _lastLogged)
+        {
+            _lastLogged = _snapped;
+            Log.Msg($"Laser snapped to '{_snapped.name}' ({best:F0} px away).");
         }
         return _snapped != null ? Inside(bestRect, point, scale) : point;
     }
