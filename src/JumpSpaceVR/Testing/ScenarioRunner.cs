@@ -106,6 +106,9 @@ internal sealed class ScenarioRunner
             else if (now > deadline)
             {
                 Fail($"waitfor {metric} {op} {value} timed out (last {Format(current)})");
+                // Record where things stood, so an intermittent failure explains itself afterwards.
+                _command("diagnostics");
+                _command("snapshot");
                 _waitFor = null;
             }
             else

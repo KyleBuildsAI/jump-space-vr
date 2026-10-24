@@ -48,6 +48,11 @@ while ((Get-Date) -lt $deadline) {
 }
 
 $results = Select-String -Path $log -Pattern '\[scenario\]' | ForEach-Object { $_.Line }
+
+# MelonLoader keeps only its last few logs; keep each scenario's own copy for looking into failures later.
+$logArchive = Join-Path ([System.IO.Path]::GetTempPath()) 'JumpSpaceVR-scenario-logs'
+New-Item -ItemType Directory -Force -Path $logArchive | Out-Null
+Copy-Item $log (Join-Path $logArchive ("{0}-{1:yyyyMMdd-HHmmss}.log" -f [System.IO.Path]::GetFileNameWithoutExtension($scenarioPath), (Get-Date))) -ErrorAction SilentlyContinue
 $results
 if (-not $done) { Write-Warning "Scenario did not finish within $TimeoutSeconds s." }
 

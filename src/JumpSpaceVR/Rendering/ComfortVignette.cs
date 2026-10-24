@@ -44,7 +44,8 @@ internal sealed class ComfortVignette
     public float Intensity { get; private set; }
 
     /// <summary>Call once per rendered frame with the view's base pose (before head tracking is added).</summary>
-    public void Update(ComfortVignetteLevel level, Vector3 basePosition, Quaternion baseRotation)
+    /// <param name="ownSteps">The character is following the player's own steps (room-scale): not artificial motion.</param>
+    public void Update(ComfortVignetteLevel level, Vector3 basePosition, Quaternion baseRotation, bool ownSteps)
     {
         var deltaTime = Mathf.Max(Time.unscaledDeltaTime, 1e-4f);
         var yaw = baseRotation.eulerAngles.y;
@@ -53,7 +54,7 @@ internal sealed class ComfortVignette
         {
             var step = basePosition - _lastPosition;
             step.y = 0f;
-            var speed = step.magnitude < MaxPlausibleStep ? step.magnitude / deltaTime : 0f;
+            var speed = step.magnitude < MaxPlausibleStep && !ownSteps ? step.magnitude / deltaTime : 0f;
             var turnRate = Mathf.Abs(Mathf.DeltaAngle(_lastYaw, yaw)) / deltaTime;
             target = Strength(level) * Mathf.Clamp01(Mathf.Max(speed / FullSpeed, turnRate / FullTurnRate));
         }
@@ -67,6 +68,9 @@ internal sealed class ComfortVignette
             Intensity = 0f;
         Show(Intensity);
     }
+
+    /// <summary>The view jumped to another camera: don't count the jump as motion.</summary>
+    public void ResetMotion() => _hasLast = false;
 
     /// <summary>Removes the vignette (VR stopped).</summary>
     public void Clear()

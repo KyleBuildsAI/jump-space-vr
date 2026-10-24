@@ -67,6 +67,8 @@ internal sealed class VrCameraRig
     private VrGraphicsQuality _appliedQuality = VrGraphicsQuality.Game;
     private HDAdditionalCameraData _appliedQualityData;
     private DlssMode _appliedDlss = DlssMode.Game;
+    // The game camera's own DLSS settings, kept while the mod overrides them so they can be handed back.
+    private (bool DynamicResolution, bool Dlss, bool CustomQuality, bool OptimalSettings, uint Quality, bool CameraDynamicResolution)? _gameDlss;
     private HDAdditionalCameraData _appliedDlssData;
     private HDAdditionalCameraData _appliedDlssRightData;
 
@@ -187,6 +189,16 @@ internal sealed class VrCameraRig
     public void Release()
     {
         RestoreGamePose();
+        // Hand the game camera's DLSS and frame settings back, so flat play after VR (F8) looks as the game set it.
+        RestoreDlss();
+        if (_sourceData != null)
+        {
+            _graphicsQuality.SetExtraOff("");
+            _graphicsQuality.Apply(_sourceData, VrGraphicsQuality.Game);
+        }
+        _appliedQuality = VrGraphicsQuality.Game;
+        _appliedQualityData = null;
+        _appliedExtra = "";
         if (_camera != null)
         {
             _camera.targetTexture = null;
@@ -327,14 +339,22 @@ internal sealed class VrCameraRig
     /// </summary>
     private void ApplyDlss()
     {
-        if (Dlss == DlssMode.Game || _sourceData == null)
+        if (_sourceData == null)
             return;
+        if (Dlss == DlssMode.Game)
+        {
+            RestoreDlss();
+            return;
+        }
         // Only touch the cameras when something changed: rewriting DLSS settings makes HDRP rebuild its DLSS state.
         if (Dlss == _appliedDlss && _sourceData == _appliedDlssData && _rightEyeData == _appliedDlssRightData)
             return;
         _appliedDlss = Dlss;
         _appliedDlssData = _sourceData;
         _appliedDlssRightData = _rightEyeData;
+        _gameDlss ??= (_sourceData.allowDynamicResolution, _sourceData.allowDeepLearningSuperSampling,
+            _sourceData.deepLearningSuperSamplingUseCustomQualitySettings, _sourceData.deepLearningSuperSamplingUseOptimalSettings,
+            _sourceData.deepLearningSuperSamplingQuality, _camera.allowDynamicResolution);
         var enabled = Dlss != DlssMode.Off;
         foreach (var data in new[] { _sourceData, _rightEyeData })
         {
@@ -355,6 +375,25 @@ internal sealed class VrCameraRig
                 };
         }
         _camera.allowDynamicResolution = enabled;
+    }
+
+    /// <summary>Puts the game camera's own DLSS settings back (DLSS set to Game, or VR stopping).</summary>
+    private void RestoreDlss()
+    {
+        if (_gameDlss is { } game && _sourceData != null)
+        {
+            _sourceData.allowDynamicResolution = game.DynamicResolution;
+            _sourceData.allowDeepLearningSuperSampling = game.Dlss;
+            _sourceData.deepLearningSuperSamplingUseCustomQualitySettings = game.CustomQuality;
+            _sourceData.deepLearningSuperSamplingUseOptimalSettings = game.OptimalSettings;
+            _sourceData.deepLearningSuperSamplingQuality = game.Quality;
+            if (_camera != null)
+                _camera.allowDynamicResolution = game.CameraDynamicResolution;
+        }
+        _gameDlss = null;
+        _appliedDlss = DlssMode.Game;
+        _appliedDlssData = null;
+        _appliedDlssRightData = null;
     }
 
     /// <summary>Developer option: extra frame settings to switch off (see <see cref="GraphicsQuality.SetExtraOff"/>).</summary>

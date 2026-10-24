@@ -26,6 +26,7 @@ internal sealed class PointerAssist
 
     private readonly List<(Selectable Selectable, RectTransform Rect, Camera Camera)> _targets = new();
     private readonly Il2CppStructArray<Vector3> _corners = new(4);
+    private readonly List<(Selectable Selectable, Rect Rect)> _visible = new();
     private float _nextRefresh;
     private Vector2 _smoothed;
     private bool _hasSmoothed;
@@ -75,13 +76,19 @@ internal sealed class PointerAssist
 
     private Vector2 Snap(Vector2 point, float scale)
     {
+        // Usability and screen rects once per frame (each is several engine calls per element).
+        _visible.Clear();
+        foreach (var (selectable, rect, camera) in _targets)
+        {
+            if (Usable(selectable) && ScreenRect(rect, camera, out var screenRect))
+                _visible.Add((selectable, screenRect));
+        }
+
         Selectable nearest = null;
         var best = float.MaxValue;
         Rect bestRect = default;
-        foreach (var (selectable, rect, camera) in _targets)
+        foreach (var (selectable, screenRect) in _visible)
         {
-            if (!Usable(selectable) || !ScreenRect(rect, camera, out var screenRect))
-                continue;
             var distance = Distance(screenRect, point);
             if (distance < best)
             {
@@ -124,14 +131,15 @@ internal sealed class PointerAssist
 
     private bool TryRect(Selectable selectable, out Rect rect)
     {
-        rect = default;
-        if (!Usable(selectable))
-            return false;
-        foreach (var (candidate, rectTransform, camera) in _targets)
+        foreach (var (candidate, screenRect) in _visible)
         {
             if (candidate == selectable)
-                return ScreenRect(rectTransform, camera, out rect);
+            {
+                rect = screenRect;
+                return true;
+            }
         }
+        rect = default;
         return false;
     }
 

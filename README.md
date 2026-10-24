@@ -211,19 +211,21 @@ launch with the mod.
   line up exactly with the 3D objects they label. Unity renders all overlay canvases in one pass, which rules out
   splitting the markers from the HUD cheaply. The panel follow modes and size settings help with readability.
 - **Weapon in hand.** The gun moves to your right controller and the first-person arms bend to follow (the body
-  stays where the game puts it; arms stretch a little when your hand is further away than the character's arm).
+  stands under your head; arms stretch a little when your hand is further away than the character's arm).
   It only applies while you hold an item (the hangar and missions, not the prologue opening). If the grip sits
   wrong, use the weapon offset sliders in the mod menu; turn "Weapon in hand" off to keep the game's own placement.
 - **Room-scale movement.** By default, walking around your room moves your view but not your character. Turn on
   "Room-scale walking" in the mod menu (experimental) to make the character follow your physical steps.
-- **Performance.** Each eye is a full HDRP render. If gameplay feels juddery, lower "Render scale" in the mod menu.
-- **No controller vibration.** The game never sends rumble to gamepads, so there is nothing to forward.
+- **Performance.** Each eye is a full HDRP render, and the game is mostly limited by the CPU in VR, so render scale
+  and DLSS help less than "VR graphics" Low or Medium (shorter shadows, fewer per-eye passes) and "View distance".
+- **Gamepad and the VR menu.** With a real gamepad, the VR menu reads the pad, but the game still sees it too (A, B
+  and the sticks also act in the game while the menu is open). Pause the game first, or use the VR controllers.
 - **SteamVR overlays.** The SteamVR dashboard and overlay tools such as OVR Advanced Settings can take focus at
   startup. Close the dashboard if the game appears frozen in the headset.
-- **Partly tested on hardware.** The headset view, menus and recentering were tested on a Quest 3 over Steam
-  Link. Automated scenario tests cover the laser pointer, motion aiming, turning and the trigger on the mock
-  runtime. Weapon-in-hand placement, comfort and frame rate in long sessions still need headset play. Reports are
-  welcome; include the `F10` snapshots and `MelonLoader/Latest.log`.
+- **Partly tested on hardware.** Hours of play on a Quest 3 over Steam Link shaped most features; the newest ones
+  (ship-floor levelling, first person when boosting or sitting, galaxy map, comfort vignette, real crouch, co-op
+  hands) are covered by the automated scenario tests but not yet confirmed in a headset. Reports are welcome;
+  include the `F10` snapshots and `MelonLoader/Latest.log`.
 
 ## Play responsibly
 

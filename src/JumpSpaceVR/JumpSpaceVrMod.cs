@@ -115,6 +115,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         // recentering would only jolt it.
         _cameraRig.CameraChanged += () =>
         {
+            _vignette.ResetMotion();
             if (!_firstPerson.RecentlyActive)
                 _recenterPending = true;
         };
@@ -483,6 +484,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "eyeVolumetrics" => _cameraRig.LeftEye != null &&
                 _cameraRig.LeftEye.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>() is { } eyeData &&
                 eyeData.m_RenderingPathCustomFrameSettings.IsEnabled(UnityEngine.Rendering.HighDefinition.FrameSettingsField.Volumetrics) ? 1f : 0f,
+            // The game camera itself (also with VR off), to check what the mod leaves behind.
+            "gameVolumetrics" => camera != null &&
+                camera.GetComponent<UnityEngine.Rendering.HighDefinition.HDAdditionalCameraData>() is { } gameData &&
+                gameData.m_RenderingPathCustomFrameSettings.IsEnabled(UnityEngine.Rendering.HighDefinition.FrameSettingsField.Volumetrics) ? 1f : 0f,
             "dlssRunning" => _cameraRig.DlssRunning ? 1f : 0f,
             "eyeFarClip" => _cameraRig.RightEye != null ? _cameraRig.RightEye.farClipPlane : null,
             "lodBias" => QualitySettings.lodBias,
@@ -958,6 +963,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _handSync.Reset();
         _firstPerson.Release();
         _vignette.Clear();
+        _realCrouch.UpdateLift(false, 0f, false);
         FirstPersonRenderFix.Apply(false);
         _gamepad.Remove();
         _uiCompositor.Stop();
@@ -1014,9 +1020,14 @@ public sealed class JumpSpaceVrMod : MelonMod
             var playerHandler = Il2Cpp.PlayerHandler.GetPlayerHandler;
             var localPlayer = playerHandler != null ? playerHandler.localPlayerController : null;
             _frame.Update(localPlayer != null ? localPlayer.transform : null);
+            // Height above the feet along the character's own up (a rolled ship tilts it). No player (menus,
+            // loading): no lift, so a crouch held while leaving a level doesn't leave the view raised.
             if (localPlayer != null && Camera.main != null)
-                _realCrouch.UpdateLift(_config.RealCrouch.Value, Camera.main.transform.position.y - localPlayer.transform.position.y,
+                _realCrouch.UpdateLift(_config.RealCrouch.Value,
+                    Vector3.Dot(Camera.main.transform.position - localPlayer.transform.position, _frame.Rotation * Vector3.up),
                     LocalPlayerCrouching());
+            else
+                _realCrouch.UpdateLift(false, 0f, false);
             _motion.Frame = _frame.Rotation;
             if (_frame.Tilt > 30f != _frameTilted)
             {
@@ -1050,7 +1061,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
                 _headAudio.UpdateHeadPose(_cameraRig.LeftEye, _cameraRig.RightEye);
-                _vignette.Update(_config.ComfortVignette.Value, _cameraRig.GamePosition, _cameraRig.ViewRotation);
+                _vignette.Update(_config.ComfortVignette.Value, _cameraRig.GamePosition, _cameraRig.ViewRotation, _roomscale.Driving);
                 _eyeHeights.Add(_cameraRig.LeftEye.transform.position.y, Time.unscaledTime);
                 _uiCompositor.MirrorSource = _stereoRenderer.LeftTexture;
                 var headPosition = (left.Position + right.Position) * 0.5f * _config.WorldScale.Value;

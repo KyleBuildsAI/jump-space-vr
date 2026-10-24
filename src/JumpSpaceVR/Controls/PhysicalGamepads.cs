@@ -79,7 +79,8 @@ internal sealed class PhysicalGamepads
 
         GamepadActive = mode switch
         {
-            ControllerMode.Gamepad => true,
+            // Only with a pad actually connected; otherwise the VR controllers (and the menu) would be locked out.
+            ControllerMode.Gamepad => Current != null && Current.added,
             ControllerMode.MotionControllers => false,
             _ => _lastPadUse > _lastControllerUse,
         };
