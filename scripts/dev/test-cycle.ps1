@@ -22,7 +22,9 @@ param(
     # Rotate the simulated pointer to verify motion aiming moves the game camera.
     [switch]$DebugAim,
     # Scenario script for the mod's test harness (see scenarios/).
-    [string]$Scenario
+    [string]$Scenario,
+    # Start the mod with every setting at its default (tests) instead of the player's own settings.
+    [switch]$DefaultSettings
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,6 +45,15 @@ function Set-RuntimeOverride([string]$RuntimeJson, [bool]$DeveloperOptions) {
     Set-Content -Path $configFile -Value $content -NoNewline
 }
 
+# Empties the mod's settings section so the mod starts with its defaults (run-scenario.ps1 restores the file).
+function Clear-ModSettings {
+    $configFile = Join-Path $GamePath 'UserData\MelonPreferences.cfg'
+    if (-not (Test-Path $configFile)) { return }
+    $content = Get-Content $configFile -Raw
+    $content = [regex]::Replace($content, '(?ms)^\[JumpSpaceVR\]\r?\n.*?(?=^\[|\z)', "[JumpSpaceVR]`r`n`r`n")
+    Set-Content -Path $configFile -Value $content -NoNewline
+}
+
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 
 & (Join-Path $PSScriptRoot 'stop-game.ps1') | Out-Null
@@ -60,6 +71,7 @@ if ((Test-Path $userConfig) -and ((Get-Content $userConfig -Raw) -match "(?m)^Op
 $runtimeJson = ''
 if ($RuntimeManifest) { $runtimeJson = $RuntimeManifest }
 elseif (-not $RealRuntime) { $runtimeJson = & (Join-Path $PSScriptRoot 'prepare-mock-runtime.ps1') }
+if ($DefaultSettings) { Clear-ModSettings }
 Set-RuntimeOverride $runtimeJson (-not $RealRuntime)
 
 $launchTime = Get-Date
