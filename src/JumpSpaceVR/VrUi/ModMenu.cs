@@ -35,6 +35,7 @@ internal sealed class ModMenu
         public Func<string> Value;
         public Action<int> Change;
         public Action Activate;
+        public bool Repeats;
     }
 
     private readonly List<Item> _items = new();
@@ -89,6 +90,7 @@ internal sealed class ModMenu
         {
             Label = label,
             Value = () => entry.Value.ToString(format),
+            Repeats = true,
             Change = direction =>
             {
                 entry.Value = Mathf.Clamp((float)Math.Round(entry.Value + direction * step, 3), min, max);
@@ -225,6 +227,9 @@ internal sealed class ModMenu
         }
 
         if (direction == 0 || now < _nextRepeatTime)
+            return;
+        // Holding left/right only repeats on numbers; on toggles and choices it would flip back and forth.
+        if (Math.Abs(direction) == 2 && !_items[_selected].Repeats)
             return;
         var held = now - _heldSince;
         _nextRepeatTime = now + (held >= FastAfter ? FastRepeatInterval : RepeatInterval);

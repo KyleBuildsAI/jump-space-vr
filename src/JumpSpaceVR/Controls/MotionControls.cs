@@ -113,10 +113,14 @@ internal sealed class MotionControls
 
     public void Activate() => _instance = this;
 
+    /// <summary>True while this instance receives the spring-arm hook (motion aiming can steer the camera).</summary>
+    public static bool IsHookedInstance(MotionControls motion) => _instance == motion;
+
     public void Deactivate()
     {
         IsActive = false;
         _hasAimTarget = false;
+        Arms.Idle();
         RestoreWeapon();
         if (_instance == this)
             _instance = null;
@@ -155,7 +159,8 @@ internal sealed class MotionControls
     /// line the sights up with one eye instead of the point between the eyes).
     /// </param>
     public void UpdatePose(Vector3 viewOrigin, Quaternion viewRotation, in TrackedPose hand, in TrackedPose pointer,
-        in TrackedPose leftHand, float leftGrip, float worldScale, Vector3 weaponOffset, bool moveWeapon, Vector3 sightShift)
+        in TrackedPose leftHand, in TrackedPose leftPointer, float leftGrip, float worldScale, Vector3 weaponOffset, bool moveWeapon,
+        Vector3 sightShift)
     {
         if (!IsActive || !pointer.IsValid)
         {
@@ -173,8 +178,10 @@ internal sealed class MotionControls
         if (moveWeapon && hand.IsValid)
         {
             var handPose = new HandPose(viewOrigin + viewRotation * ((hand.Position + DebugHandOffset) * worldScale), pointerRotation);
+            // Left hand: grip position with the aim pose's rotation, matching how the right hand drives the gun.
             HandPose? left = leftHand.IsValid
-                ? new HandPose(viewOrigin + viewRotation * (leftHand.Position * worldScale), viewRotation * leftHand.Rotation)
+                ? new HandPose(viewOrigin + viewRotation * (leftHand.Position * worldScale),
+                    viewRotation * (leftPointer.IsValid ? leftPointer.Rotation : leftHand.Rotation))
                 : null;
             var rig = FindWeapon();
             if (rig == null || !Arms.Update(rig, handPose, pointerRotation, left, leftGrip, weaponOffset, viewRotation))

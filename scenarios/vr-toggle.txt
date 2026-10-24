@@ -35,6 +35,8 @@ recenter
 wait 2
 expect rightHandValid == 1
 expect motionActive == 1
+# Motion aiming is hooked up again after each restart (it used to stay off after the first F8 off/on).
+expect aimHookActive == 1
 expect laserOnPanel == 1
 expect stereoWeapon == 1
 expect fps > 45

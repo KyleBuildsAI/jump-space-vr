@@ -32,6 +32,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<Controls.AimEye> AimEye { get; }
     public MelonPreferences_Entry<float> ViewDistance { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
+    public MelonPreferences_Entry<bool> ShowCrosshair { get; }
     public MelonPreferences_Entry<bool> MotionControls { get; }
     public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
     public MelonPreferences_Entry<float> SnapTurnAngle { get; }
@@ -106,6 +107,8 @@ internal sealed class ModConfig
             "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
         ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
             "Multiplies how far the game draws (far clip plane and level of detail). Higher costs frame rate.");
+        ShowCrosshair = _category.CreateEntry("ShowCrosshair", false, "Show crosshair",
+            "Show the game's crosshair on the VR UI panel (it doesn't line up with a gun aimed by hand).");
         ShowFrameRate = _category.CreateEntry("ShowFrameRate", false, "Show frame rate",
             "Show the current frame rate in the corner of the UI panel.");
         HideCinematicBars = _category.CreateEntry("HideCinematicBars", true, "Hide cinematic bars",
@@ -113,7 +116,7 @@ internal sealed class ModConfig
         RoomscaleWalking = _category.CreateEntry("RoomscaleWalking", false, "Room-scale walking",
             "Experimental: when you physically step away from your character, the character walks after you.");
         RenderScale = _category.CreateEntry("RenderScale", 1.0f, "Render scale",
-            "Eye texture resolution multiplier (0.5 - 2.0). Lower it for performance.");
+            "Eye texture resolution multiplier (0.5 - 3.0). Lower it for performance.");
         SinglePassInstanced = _category.CreateEntry("SinglePassInstanced", false, "Single pass instanced",
             "Experimental. Faster, but the game's shaders may not support it (black or one-eye rendering).");
         MoveUiIntoVr = _category.CreateEntry("MoveUiIntoVr", true, "Move UI into VR",
@@ -153,7 +156,9 @@ internal sealed class ModConfig
         _category.SaveToFile(false);
     }
 
-    public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 2.0f);
+    public float ClampedRenderScale => Mathf.Clamp(RenderScale.Value, 0.5f, 3.0f);
+
+    public float ClampedViewDistance => Mathf.Clamp(ViewDistance.Value, 0.5f, 4f);
 
     private readonly Dictionary<string, object> _temporaryOriginals = new();
 

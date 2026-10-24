@@ -41,6 +41,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VrUi.CinematicBars _cinematicBars = new();
     private readonly SessionReport _sessionReport = new();
     private readonly VrUi.FrameRateCounter _frameRateCounter = new();
+    private readonly VrUi.CrosshairHider _crosshairHider = new();
     private float _aimDownSights;
     private Vector3 _lastSightShift;
     private ControllerState _rawControllerState;
@@ -107,7 +108,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         _motion.RestoreWeapon();
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
         _frameRateCounter.Update(_config.ShowFrameRate.Value);
-        ApplyLodDistance(_runtime != null && _runtime.IsRendering ? _config.ViewDistance.Value : 1f);
+        _crosshairHider.Update(_runtime != null && _runtime.IsRendering && !_config.ShowCrosshair.Value);
+        ApplyLodDistance(_runtime != null && _runtime.IsRendering ? _config.ClampedViewDistance : 1f);
         // After the restore, so scenario checks see the game's own camera rather than the headset view.
         _scenario?.Update();
         HandleHotkeys();
@@ -161,9 +163,10 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
         _modMenu.AddNumber("View distance", _config.ViewDistance, 0.25f, 0.5f, 4f, "0.00x");
         _modMenu.AddToggle("Show frame rate", _config.ShowFrameRate);
+        _modMenu.AddToggle("Show crosshair", _config.ShowCrosshair);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
-        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
-            value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
+        _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 3f, "0.0",
+            value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 3f));
         _modMenu.AddToggle("VR controllers as gamepad", _config.ControllersAsGamepad);
         _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
         _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
@@ -225,7 +228,12 @@ public sealed class JumpSpaceVrMod : MelonMod
     private void UpdateControllers()
     {
         if (!_vrRequested || _runtime == null || !_runtime.IsRendering || !_config.ControllersAsGamepad.Value)
+        {
+            // No fresh controller input this frame: don't let the menu or tests act on a stale held stick.
+            _lastControllerState = default;
+            _rawControllerState = default;
             return;
+        }
 
         if (_config.MockControllerInput.Value || _scenario != null)
             _mockInput.Apply();
@@ -301,6 +309,8 @@ public sealed class JumpSpaceVrMod : MelonMod
             "eyeFarClip" => _cameraRig.RightEye != null ? _cameraRig.RightEye.farClipPlane : null,
             "lodBias" => QualitySettings.lodBias,
             "sightShiftCm" => _lastSightShift.magnitude * 100f,
+            "crosshairVisible" => GameObject.Find("PF_GUI/FullScreenGUI/PF_FirstPersonHUD/Crosshairs") is { } crosshairs &&
+                crosshairs.transform.localScale.sqrMagnitude > 0f ? 1f : 0f,
             "frameRateShown" => GameObject.Find("JumpSpaceVR_FrameRate") != null ? 1f : 0f,
             "memoryMb" => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024f * 1024f),
             "eyeJolt" => _eyeHeights.MaxSpeedChange * 100f,
@@ -324,6 +334,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "canGrab" => _motion.Arms.CanGrab ? 1f : 0f,
             "rightHandErrorCm" => _motion.Arms.RightHandError * 100f,
             "leftHandErrorCm" => _motion.Arms.LeftHandError * 100f,
+            "aimHookActive" => MotionControls.IsHookedInstance(_motion) ? 1f : 0f,
             "holdsItem" => _motion.HoldsItem ? 1f : 0f,
             "weaponInHand" => _motion.WeaponInHand ? 1f : 0f,
             "itemLocator" => _motion.HasItemLocator ? 1f : 0f,
@@ -458,6 +469,9 @@ public sealed class JumpSpaceVrMod : MelonMod
     {
         if (Mathf.Approximately(scale, _appliedLodScale))
             return;
+        // If the game changed its own setting meanwhile (graphics menu), take that as the new base.
+        if (_gameLodBias.HasValue && !Mathf.Approximately(QualitySettings.lodBias, _gameLodBias.Value * _appliedLodScale))
+            _gameLodBias = QualitySettings.lodBias / _appliedLodScale;
         _gameLodBias ??= QualitySettings.lodBias;
         QualitySettings.lodBias = _gameLodBias.Value * scale;
         _appliedLodScale = scale;
@@ -615,6 +629,8 @@ public sealed class JumpSpaceVrMod : MelonMod
             _runtime.QuietFailures = false;
 
             HookBeforeRender();
+            // Every time VR starts (also after F8 off/on), not only when the hooks are first installed.
+            _motion.Activate();
             XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
             _recenterPending = true;
 
@@ -682,7 +698,6 @@ public sealed class JumpSpaceVrMod : MelonMod
                               && StereoRenderer.InstallHooks(HarmonyInstance);
         FirstPersonRenderFix.InstallHooks(HarmonyInstance);
         MotionControls.InstallHooks(HarmonyInstance);
-        _motion.Activate();
     }
 
 
@@ -724,7 +739,7 @@ public sealed class JumpSpaceVrMod : MelonMod
 
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
-                    _config.ViewDistance.Value))
+                    _config.ClampedViewDistance))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
@@ -745,7 +760,8 @@ public sealed class JumpSpaceVrMod : MelonMod
                 UpdateLaserPointer(laserPointer);
                 _motion.UpdatePose(_cameraRig.GamePosition, _cameraRig.ViewRotation,
                     _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
-                    _headTracker.Localize(controllers.LeftHand, positional), _rawControllerState.LeftGrip,
+                    _headTracker.Localize(controllers.LeftHand, positional), _headTracker.Localize(controllers.LeftPointer, positional),
+                    _rawControllerState.LeftGrip,
                     _config.WorldScale.Value,
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
                     _config.WeaponInHand.Value, SightShift());
