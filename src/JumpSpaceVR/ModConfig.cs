@@ -35,6 +35,7 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<float> ViewDistance { get; }
     public MelonPreferences_Entry<float> ShadowDistance { get; }
     public MelonPreferences_Entry<Rendering.ComfortVignetteLevel> ComfortVignette { get; }
+    public MelonPreferences_Entry<bool> RealCrouch { get; }
     public MelonPreferences_Entry<string> DebugFrameSettingsOff { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> ShowCrosshair { get; }
@@ -131,6 +132,8 @@ internal sealed class ModConfig
             "Developer option for measuring frame rate: HDRP frame settings to switch off on the eye cameras, comma separated.");
         ComfortVignette = _category.CreateEntry("ComfortVignette", Rendering.ComfortVignetteLevel.Off, "Comfort vignette",
             "Darken the edges of the view while the stick moves or turns you (helps against motion sickness): Off, Low, Medium, High.");
+        RealCrouch = _category.CreateEntry("RealCrouch", false, "Real crouch",
+            "Duck in your room to crouch in the game (and stand up to stand). Recenter while standing. On foot only.");
         ShadowDistance = _category.CreateEntry("ShadowDistance", 0f, "VR shadow distance (m)",
             "How far sun shadows reach in VR. Each eye draws them again, so a shorter distance saves CPU time. 0 is automatic: " +
             "40 m at VR graphics Low, 80 m at Medium, the game's own distance otherwise.");
