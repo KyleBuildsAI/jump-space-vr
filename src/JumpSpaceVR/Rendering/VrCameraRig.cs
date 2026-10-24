@@ -26,6 +26,8 @@ internal sealed class VrCameraRig
     private bool _hasSmoothedOffset;
     private int _gameCullingMask;
     private bool _cullingMaskChanged;
+    private float _gameFarClip;
+    private bool _farClipChanged;
 
     // Names of the game's camera-shake layers, outermost first; the view is anchored above them.
     private static readonly string[] StableAnchorNames = { "CameraController", "CameraKnocker", "Crouch", "CameraRoot" };
@@ -46,6 +48,9 @@ internal sealed class VrCameraRig
 
     /// <summary>Raised when the rig switches to a new game camera (level load, ship, cutscene).</summary>
     public event System.Action CameraChanged;
+
+    /// <summary>Where the game's own camera was this frame (the point its first-person weapon is built around).</summary>
+    public Vector3 GameCameraPosition { get; private set; }
 
     /// <summary>World pose the game gave its camera this frame, before the head offset.</summary>
     public Vector3 GamePosition { get; private set; }
@@ -74,6 +79,11 @@ internal sealed class VrCameraRig
             _camera.cullingMask = _gameCullingMask;
             _cullingMaskChanged = false;
         }
+        if (_farClipChanged)
+        {
+            _camera.farClipPlane = _gameFarClip;
+            _farClipChanged = false;
+        }
 
         // Only undo what nothing else changed since we applied it. Position and rotation are separate: the game
         // moves the camera locally every frame (spring arm length, bob) but leaves its rotation to the parents,
@@ -89,13 +99,14 @@ internal sealed class VrCameraRig
     /// Call from the before-render hook, after all gameplay camera updates.
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
-        bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null)
+        bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null, float viewDistance = 1f)
     {
         if (!EnsureCameras())
             return false;
 
         _baseLocalPosition = _cameraTransform.localPosition;
         _baseLocalRotation = _cameraTransform.localRotation;
+        GameCameraPosition = _cameraTransform.position;
         var basePosition = stabilizeView ? StablePosition() : _cameraTransform.position;
         var baseRotation = _cameraTransform.rotation;
         GamePosition = basePosition;
@@ -120,6 +131,14 @@ internal sealed class VrCameraRig
         {
             _camera.cullingMask = _gameCullingMask | extraCullingMask;
             _cullingMaskChanged = true;
+        }
+
+        // View distance: draw further than the game does (far clip plane; level of detail is scaled by the caller).
+        _gameFarClip = _camera.farClipPlane;
+        if (!Mathf.Approximately(viewDistance, 1f))
+        {
+            _camera.farClipPlane = _gameFarClip * viewDistance;
+            _farClipChanged = true;
         }
 
         SyncRightEyeSettings();

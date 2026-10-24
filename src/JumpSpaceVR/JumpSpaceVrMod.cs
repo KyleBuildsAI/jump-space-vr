@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.4.3", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.5.0", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -40,6 +40,9 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly VirtualMouse _mouse = new();
     private readonly VrUi.CinematicBars _cinematicBars = new();
     private readonly SessionReport _sessionReport = new();
+    private readonly VrUi.FrameRateCounter _frameRateCounter = new();
+    private float _aimDownSights;
+    private Vector3 _lastSightShift;
     private ControllerState _rawControllerState;
     private Vector2? _pointerScreen;
     private bool _pointerOwnsCursor;
@@ -103,6 +106,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         _cameraRig.RestoreGamePose();
         _motion.RestoreWeapon();
         _cinematicBars.Update(_runtime != null && _runtime.IsRendering && _config.HideCinematicBars.Value);
+        _frameRateCounter.Update(_config.ShowFrameRate.Value);
+        ApplyLodDistance(_runtime != null && _runtime.IsRendering ? _config.ViewDistance.Value : 1f);
         // After the restore, so scenario checks see the game's own camera rather than the headset view.
         _scenario?.Update();
         HandleHotkeys();
@@ -134,6 +139,14 @@ public sealed class JumpSpaceVrMod : MelonMod
         }
     }
 
+    private void ResetAllSettings()
+    {
+        _config.ResetAll();
+        XRSettings.eyeTextureResolutionScale = _config.ClampedRenderScale;
+        _snapPanelToHead = true;
+        Log.Msg("All Jump Space VR settings reset to their defaults.");
+    }
+
     private void BuildModMenu()
     {
         _modMenu.AddChoice("UI follow mode", _config.UiFollow, _ => _snapPanelToHead = true);
@@ -146,6 +159,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddToggle("Positional tracking (6DoF)", _config.PositionalTracking);
         _modMenu.AddToggle("Room-scale walking", _config.RoomscaleWalking);
         _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
+        _modMenu.AddNumber("View distance", _config.ViewDistance, 0.25f, 0.5f, 4f, "0.00x");
+        _modMenu.AddToggle("Show frame rate", _config.ShowFrameRate);
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
         _modMenu.AddNumber("Render scale", _config.RenderScale, 0.1f, 0.5f, 2f, "0.0",
             value => XRSettings.eyeTextureResolutionScale = Mathf.Clamp(value, 0.5f, 2f));
@@ -156,12 +171,14 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("Snap turn angle", _config.SnapTurnAngle, 15f, 15f, 90f, "0");
         _modMenu.AddNumber("Smooth turn speed", _config.SmoothTurnSpeed, 15f, 30f, 360f, "0");
         _modMenu.AddToggle("Weapon in hand", _config.WeaponInHand);
+        _modMenu.AddChoice("Aim down sights with eye", _config.AimEye);
         _modMenu.AddNumber("Weapon offset X (right)", _config.WeaponOffsetX, 0.01f, -0.5f, 0.5f, "0.00");
         _modMenu.AddNumber("Weapon offset Y (up)", _config.WeaponOffsetY, 0.01f, -0.6f, 0.4f, "0.00");
         _modMenu.AddNumber("Weapon offset Z (forward)", _config.WeaponOffsetZ, 0.01f, -0.3f, 0.8f, "0.00");
         _modMenu.AddChoice("VR runtime (F8 twice to apply)", _config.Runtime);
         _modMenu.AddAction("Recenter view", () => _recenterPending = true);
         _modMenu.AddAction("Close", () => _modMenu.Close());
+        _modMenu.AddConfirmedAction("Reset all settings", ResetAllSettings);
     }
 
     /// <summary>Hold the right thumbstick click for a second to open or close the mod menu.</summary>
@@ -277,6 +294,10 @@ public sealed class JumpSpaceVrMod : MelonMod
         return name switch
         {
             "fps" => Diagnostics.AverageFps,
+            "eyeFarClip" => _cameraRig.RightEye != null ? _cameraRig.RightEye.farClipPlane : null,
+            "lodBias" => QualitySettings.lodBias,
+            "sightShiftCm" => _lastSightShift.magnitude * 100f,
+            "frameRateShown" => GameObject.Find("JumpSpaceVR_FrameRate") != null ? 1f : 0f,
             "memoryMb" => System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024f * 1024f),
             "eyeJolt" => _eyeHeights.MaxSpeedChange * 100f,
             "worstFrameMs" => Diagnostics.WorstFrameMs,
@@ -288,6 +309,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "aimYawOffset" => cameraYaw.HasValue ? Mathf.DeltaAngle(_motion.Body.Yaw, cameraYaw.Value) : null,
             "motionActive" => _motion.IsActive ? 1f : 0f,
             "letterboxVisible" => IsLetterboxVisible() ? 1f : 0f,
+            "holdsItem" => _motion.HoldsItem ? 1f : 0f,
             "weaponInHand" => _motion.WeaponInHand ? 1f : 0f,
             "itemLocator" => _motion.HasItemLocator ? 1f : 0f,
             "gripErrorCm" => _motion.LastGripError * 100f,
@@ -408,6 +430,41 @@ public sealed class JumpSpaceVrMod : MelonMod
         _uiCompositor.CursorUv = uv;
         _pointerScreen = new Vector2(uv.x * Screen.width, uv.y * Screen.height);
         _pointerOwnsCursor = !inLevel;
+    }
+
+    private float? _gameLodBias;
+    private float _appliedLodScale = 1f;
+
+    /// <summary>Scales the level-of-detail distances with the view distance setting; 1 restores the game's value.</summary>
+    private void ApplyLodDistance(float scale)
+    {
+        if (Mathf.Approximately(scale, _appliedLodScale))
+            return;
+        _gameLodBias ??= QualitySettings.lodBias;
+        QualitySettings.lodBias = _gameLodBias.Value * scale;
+        _appliedLodScale = scale;
+        if (Mathf.Approximately(scale, 1f))
+            _gameLodBias = null;
+    }
+
+    private const float AimDownSightsBlendSeconds = 0.15f;
+
+    /// <summary>
+    /// The game centres the sights on its camera, which in VR sits between the eyes, so aiming down sights makes you
+    /// go cross-eyed. While aiming (left trigger), move the weapon so the sights line up with the chosen eye.
+    /// </summary>
+    private Vector3 SightShift()
+    {
+        var aiming = _rawControllerState.LeftTrigger > 0.5f ? 1f : 0f;
+        _aimDownSights = Mathf.MoveTowards(_aimDownSights, aiming, Time.unscaledDeltaTime / AimDownSightsBlendSeconds);
+        _lastSightShift = Vector3.zero;
+        if (_aimDownSights <= 0f || _config.AimEye.Value == AimEye.Center)
+            return Vector3.zero;
+        var eye = _config.AimEye.Value == AimEye.Right ? _cameraRig.RightEye : _cameraRig.LeftEye;
+        if (eye == null)
+            return Vector3.zero;
+        _lastSightShift = (eye.transform.position - _cameraRig.GameCameraPosition) * _aimDownSights;
+        return _lastSightShift;
     }
 
     /// <summary>
@@ -648,7 +705,8 @@ public sealed class JumpSpaceVrMod : MelonMod
             float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
 
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
-                    _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw))
+                    _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
+                    _config.ViewDistance.Value))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;
@@ -671,7 +729,7 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _headTracker.Localize(controllers.RightHand, positional), _headTracker.Localize(controllers.RightPointer, positional),
                     _config.WorldScale.Value,
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
-                    _config.WeaponInHand.Value);
+                    _config.WeaponInHand.Value, SightShift());
             }
         }
         catch (Exception exception)

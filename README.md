@@ -111,6 +111,9 @@ launch with the mod.
 | `MoveUiIntoVr` | `true` | Show the UI panel in the headset. |
 | `UiDistance` / `UiWidth` | `1.6` / `1.9` | UI panel distance and width, in meters. |
 | `ControllersAsGamepad` | `true` | Use VR controllers as a gamepad. |
+| `AimEye` | `Right` | While aiming down sights (left trigger), line the sights up with this eye: `Right`, `Left` or `Center`. |
+| `ViewDistance` | `1.0` | Draw distance multiplier (level of detail and far clip), 0.5–4. Higher costs frame rate. |
+| `ShowFrameRate` | `false` | Show the frame rate in the top-left of the UI panel. |
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
@@ -223,6 +226,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
 | `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu; left stick navigates, A toggles a setting, B closes |
 | `vr-toggle.txt` (~1 min) | F8 turns VR off and on three times; the session restarts cleanly and hands, laser and weapon fix work afterwards |
+| `hangar-options.txt` (~2 min) | Enters the hangar (gun in hand): gun drawn by the eye cameras, sights move to the right eye while aiming, view distance, frame-rate counter |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,

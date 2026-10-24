@@ -29,6 +29,9 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<bool> RoomscaleWalking { get; }
     public MelonPreferences_Entry<bool> LaserPointer { get; }
     public MelonPreferences_Entry<bool> HideCinematicBars { get; }
+    public MelonPreferences_Entry<Controls.AimEye> AimEye { get; }
+    public MelonPreferences_Entry<float> ViewDistance { get; }
+    public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> MotionControls { get; }
     public MelonPreferences_Entry<Controls.TurnMode> TurnMode { get; }
     public MelonPreferences_Entry<float> SnapTurnAngle { get; }
@@ -99,6 +102,12 @@ internal sealed class ModConfig
         WeaponOffsetZ = _category.CreateEntry("WeaponOffsetZ", 0f, "Weapon grip offset Z (m)");
         LaserPointer = _category.CreateEntry("LaserPointer", true, "Laser pointer in menus",
             "In menus, point the right controller at the UI and pull the trigger to click.");
+        AimEye = _category.CreateEntry("AimEye", Controls.AimEye.Right, "Aim with eye",
+            "While aiming down sights, line the sights up with this eye (the game centres them between the eyes).");
+        ViewDistance = _category.CreateEntry("ViewDistance", 1f, "View distance",
+            "Multiplies how far the game draws (far clip plane and level of detail). Higher costs frame rate.");
+        ShowFrameRate = _category.CreateEntry("ShowFrameRate", false, "Show frame rate",
+            "Show the current frame rate in the corner of the UI panel.");
         HideCinematicBars = _category.CreateEntry("HideCinematicBars", true, "Hide cinematic bars",
             "Hide the game's black letterbox bars in VR, where they would float in front of you.");
         RoomscaleWalking = _category.CreateEntry("RoomscaleWalking", false, "Room-scale walking",
@@ -161,6 +170,14 @@ internal sealed class ModConfig
             : Convert.ChangeType(value, type, CultureInfo.InvariantCulture);
         _temporaryOriginals.TryAdd(name, entry.BoxedValue);
         entry.BoxedValue = parsed;
+    }
+
+    /// <summary>Puts every Jump Space VR setting back to its default and saves.</summary>
+    public void ResetAll()
+    {
+        foreach (var entry in _category.Entries)
+            entry.ResetToDefault();
+        _category.SaveToFile(false);
     }
 
     /// <summary>Test scenarios: a setting's current value as a number (bool 0/1, enum index), or null.</summary>

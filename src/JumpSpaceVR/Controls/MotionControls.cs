@@ -61,6 +61,17 @@ internal sealed class MotionControls
     /// <summary>Whether the rig's item locator was found (otherwise only the configured offset places it).</summary>
     public bool HasItemLocator { get; private set; }
 
+    /// <summary>True when the player's first-person rig holds an item (a gun in the hangar or a mission).</summary>
+    public bool HoldsItem
+    {
+        get
+        {
+            var weapon = FindWeapon();
+            var locator = weapon != null ? FindItemLocator(weapon) : null;
+            return locator != null && locator.childCount > 0;
+        }
+    }
+
     /// <summary>Distance between the rig's item locator and the controller grip after placement, in meters.</summary>
     public float LastGripError { get; private set; }
 
@@ -118,8 +129,12 @@ internal sealed class MotionControls
     /// Computes where the gun points in the world and places the weapon in the right hand. Call before rendering,
     /// with poses already relative to the recentered origin and the frame the eyes are built on.
     /// </summary>
+    /// <param name="sightShift">
+    /// With the weapon left where the game puts it, a world-space shift applied to it (used while aiming down sights to
+    /// line the sights up with one eye instead of the point between the eyes).
+    /// </param>
     public void UpdatePose(Vector3 viewOrigin, Quaternion viewRotation, in TrackedPose hand, in TrackedPose pointer,
-        float worldScale, Vector3 weaponOffset, bool moveWeapon)
+        float worldScale, Vector3 weaponOffset, bool moveWeapon, Vector3 sightShift)
     {
         if (!IsActive || !pointer.IsValid)
         {
@@ -135,8 +150,26 @@ internal sealed class MotionControls
 
         if (moveWeapon && hand.IsValid)
             PlaceWeapon(viewOrigin + viewRotation * ((hand.Position + DebugHandOffset) * worldScale), pointerRotation, weaponOffset);
+        else if (sightShift.sqrMagnitude > 1e-8f)
+            ShiftWeapon(sightShift);
         else
             RestoreWeapon();
+    }
+
+    private void ShiftWeapon(Vector3 worldShift)
+    {
+        var weapon = FindWeapon();
+        if (weapon == null)
+            return;
+        if (!_weaponMoved)
+        {
+            _weaponBaseLocalPosition = weapon.localPosition;
+            _weaponBaseLocalRotation = weapon.localRotation;
+        }
+        weapon.position += worldShift;
+        _weaponAppliedLocalPosition = weapon.localPosition;
+        _weaponAppliedLocalRotation = weapon.localRotation;
+        _weaponMoved = true;
     }
 
     /// <summary>Puts the first-person weapon back where the game placed it (start of frame, before gameplay).</summary>

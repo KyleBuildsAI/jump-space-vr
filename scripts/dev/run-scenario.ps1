@@ -32,6 +32,11 @@ $userRuntime = ''
 if ((Test-Path $configFile) -and ((Get-Content $configFile -Raw) -match "(?m)^OpenXRRuntimeJson = '(.*)'") -and
     -not $Matches[1].Contains('mock-runtime')) { $userRuntime = $Matches[1] }
 
+# Keep a copy of the whole settings file: scenarios may change settings in the VR menu (even reset them all), and the
+# game saves whatever it has in memory. The copy goes back once the game is stopped.
+$settingsBackup = Join-Path ([System.IO.Path]::GetTempPath()) 'JumpSpaceVR-MelonPreferences.backup.cfg'
+if (Test-Path $configFile) { Copy-Item $configFile $settingsBackup -Force }
+
 & (Join-Path $PSScriptRoot 'test-cycle.ps1') -GamePath $GamePath -Seconds 5 -KeepRunning -NoMockInput -Scenario $scenarioPath | Out-Null
 
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
@@ -46,7 +51,10 @@ $results = Select-String -Path $log -Pattern '\[scenario\]' | ForEach-Object { $
 $results
 if (-not $done) { Write-Warning "Scenario did not finish within $TimeoutSeconds s." }
 
-if (-not $KeepRunning) { & (Join-Path $PSScriptRoot 'stop-game.ps1') | Out-Null }
+if (-not $KeepRunning) {
+    & (Join-Path $PSScriptRoot 'stop-game.ps1') | Out-Null
+    if (Test-Path $settingsBackup) { Copy-Item $settingsBackup $configFile -Force }
+}
 & (Join-Path $PSScriptRoot 'reset-dev-settings.ps1') -GamePath $GamePath -RuntimeJson $userRuntime
 
 $failed = ($results | Select-String 'FAIL').Count
