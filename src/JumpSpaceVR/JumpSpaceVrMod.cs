@@ -53,6 +53,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly Tracking.ReferenceFrame _frame = new();
     private readonly ShadowBudget _shadowBudget = new();
     private readonly ComfortVignette _vignette = new();
+    private readonly RealCrouch _realCrouch = new();
     private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
@@ -200,6 +201,7 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddNumber("World scale", _config.WorldScale, 0.05f, 0.5f, 3f, "0.00");
         _modMenu.AddToggle("Hide cinematic bars", _config.HideCinematicBars);
         _modMenu.AddChoice("Comfort vignette", _config.ComfortVignette);
+        _modMenu.AddToggle("Real crouch (duck to crouch)", _config.RealCrouch);
         _modMenu.AddToggle("Always first person", _config.ForceFirstPerson);
         _modMenu.EndPage();
 
@@ -408,7 +410,29 @@ public sealed class JumpSpaceVrMod : MelonMod
             state.LeftStickClick = false;
             state.RightStickClick = false;
         }
+        if (_realCrouch.Press(_config.RealCrouch.Value && _config.PositionalTracking.Value, _headTracker.LocalPosition.y,
+                RealCrouchAllowed(), LocalPlayerCrouching(), Il2Cpp.PlayerController.m_ToggleCrouch))
+            state.ButtonB = true;
         _gamepad.Send(state);
+    }
+
+    /// <summary>
+    /// Real crouching only on foot in first person: in seats, the pilot chair, the galaxy map and menus the crouch
+    /// button (B) means exit or cancel.
+    /// </summary>
+    private bool RealCrouchAllowed()
+    {
+        var camera = Camera.main;
+        return !_pointerScreen.HasValue && !_mapView && !_firstPerson.Active && IsInLevel() && camera != null &&
+               camera.GetComponentInParent<Il2Cpp.CameraController_Character>() != null;
+    }
+
+    private static bool LocalPlayerCrouching()
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        var blackboard = player != null ? player.BlackboardData : null;
+        return blackboard != null && blackboard.m_IsCrouching.Value;
     }
 
     private bool _recenterChordHeld;
@@ -434,6 +458,10 @@ public sealed class JumpSpaceVrMod : MelonMod
             "firstPersonOverride" => _firstPerson.Active ? 1f : 0f,
             "mapView" => _mapView ? 1f : 0f,
             "vignette" => _vignette.Intensity,
+            "realCrouch" => _realCrouch.Wants ? 1f : 0f,
+            "gameCrouching" => LocalPlayerCrouching() ? 1f : 0f,
+            "crouchLiftCm" => _realCrouch.Lift * 100f,
+            "eyeY" => _cameraRig.LeftEye != null ? _cameraRig.LeftEye.transform.position.y : null,
             "planarProbes" => UnityEngine.Object.FindObjectsByType<UnityEngine.Rendering.HighDefinition.PlanarReflectionProbe>(FindObjectsSortMode.None).Length,
             "realtimeProbes" => CountRealtimeProbes(),
             "cameraX" => camera != null ? camera.transform.position.x : null,
@@ -986,6 +1014,9 @@ public sealed class JumpSpaceVrMod : MelonMod
             var playerHandler = Il2Cpp.PlayerHandler.GetPlayerHandler;
             var localPlayer = playerHandler != null ? playerHandler.localPlayerController : null;
             _frame.Update(localPlayer != null ? localPlayer.transform : null);
+            if (localPlayer != null && Camera.main != null)
+                _realCrouch.UpdateLift(_config.RealCrouch.Value, Camera.main.transform.position.y - localPlayer.transform.position.y,
+                    LocalPlayerCrouching());
             _motion.Frame = _frame.Rotation;
             if (_frame.Tilt > 30f != _frameTilted)
             {
@@ -1014,7 +1045,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             var firstPersonHead = _firstPerson.Update(_config.ForceFirstPerson.Value, Camera.main, _cutscene);
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
-                    _config.ClampedViewDistance, firstPersonHead, _frame.Rotation, fullRotation: _mapView))
+                    _config.ClampedViewDistance, firstPersonHead, _frame.Rotation, fullRotation: _mapView, lift: _realCrouch.Lift))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;

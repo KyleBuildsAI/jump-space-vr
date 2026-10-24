@@ -55,6 +55,8 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
   on a gamepad (it selects what is under its centre reticle).
 - **Comfort vignette (optional).** The edges of the view darken while the stick moves or turns you, never for your
   own head movement. Off by default; Low, Medium or High under View and comfort.
+- **Real crouch (optional).** Duck in your room to crouch in the game, stand up to stand; your view stays at your real
+  head height. On foot only. Turn it on under View and comfort; recenter while standing.
 - **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
   chair), your view stays in your character's head.
 - **Mod menu (Insert).** An in-headset settings menu, grouped into pages so everything fits: View and comfort, UI and
@@ -178,6 +180,7 @@ launch with the mod.
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
 | `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
 | `ComfortVignette` | `Off` | Darken the edges of the view while the stick moves or turns you: `Off`, `Low`, `Medium`, `High`. |
+| `RealCrouch` | `false` | Duck in your room to crouch in the game (on foot only); recenter while standing. |
 | `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
 | `ShareHands` | `false` | Co-op (beta): send your VR hands to other modded players and show theirs (the host needs the mod with this on). |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
@@ -304,6 +307,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `hand-sync.txt` (~2 min) | In the hangar: with the loopback option our shared hands go through the network format onto our own third-person arms (hand error under 6 cm), with and without weapon in hand; off shows nothing |
 | `galaxy-map.txt` (~2 min) | In the hangar: the galaxy map is shown at its camera's 60-degree downward angle; motion aim steps aside so the sticks steer the map; leaving restores the normal view |
 | `comfort-vignette.txt` (~2 min) | In the hangar: walking and smooth turning darken the view's edges, standing still and head movement don't, Off never does |
+| `real-crouch.txt` (~2 min) | In the hangar: ducking 45 cm crouches the character and the eyes drop ~45 cm, not the game's extra crouch drop on top; standing up stands; off does nothing |
 | `first-person.txt` (~2 min) | In the hangar: normal first-person play never triggers the third-person override; "level" is the world there |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 

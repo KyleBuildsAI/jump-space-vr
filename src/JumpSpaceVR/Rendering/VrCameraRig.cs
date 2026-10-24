@@ -127,7 +127,7 @@ internal sealed class VrCameraRig
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
         bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null, float viewDistance = 1f,
-        Vector3? positionOverride = null, Quaternion? frame = null, bool fullRotation = false)
+        Vector3? positionOverride = null, Quaternion? frame = null, bool fullRotation = false, float lift = 0f)
     {
         if (!EnsureCameras())
             return false;
@@ -136,7 +136,8 @@ internal sealed class VrCameraRig
         _baseLocalRotation = _cameraTransform.localRotation;
         GameCameraPosition = _cameraTransform.position;
         var stablePosition = stabilizeView ? StablePosition() : _cameraTransform.position;
-        var basePosition = positionOverride ?? stablePosition;
+        // Lift: real crouching undoes the game's crouch camera drop, so the view stays at the player's head height.
+        var basePosition = (positionOverride ?? stablePosition) + (frame ?? Quaternion.identity) * Vector3.up * lift;
         var baseRotation = _cameraTransform.rotation;
         GamePosition = basePosition;
         GameRotation = baseRotation;
