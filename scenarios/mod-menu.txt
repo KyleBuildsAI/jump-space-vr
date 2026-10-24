@@ -17,6 +17,7 @@ input right.stickclick 0
 wait 0.5
 expect modMenuOpen == 1
 expect modMenuOnPage == 0
+expect gameActionsEnabled == 0
 
 # "View and comfort" is the first category; opening it selects its first setting, "Level horizon".
 input right.a 1
@@ -65,3 +66,4 @@ wait 0.2
 input right.b 0
 wait 0.3
 expect modMenuOpen == 0
+expect gameActionsEnabled > 0

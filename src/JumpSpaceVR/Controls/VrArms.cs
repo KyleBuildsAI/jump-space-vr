@@ -41,6 +41,9 @@ internal sealed class VrArms
 
     private Transform _rig;
     private Transform _locator;
+    // Some items hang off the right hand's socket instead of the item locator; they follow the hand.
+    private Transform _handSocket;
+    private Transform _item;
     private Transform _cameraJoint;
     private Vector3 _rigBasePosition;
     private Quaternion _rigBaseRotation;
@@ -70,6 +73,12 @@ internal sealed class VrArms
 
     /// <summary>Distance from the right hand bone to its target after the last solve (meters), for tests.</summary>
     public float RightHandError { get; private set; }
+
+    /// <summary>
+    /// How far the item ended up from where it was meant to be after the last placement (meters, plus 1 mm per degree),
+    /// for tests: an item on the hand socket only gets there through the arm solve.
+    /// </summary>
+    public float ItemPlacementError { get; private set; }
 
     /// <summary>Distance from the left hand bone to its target after the last solve (meters), for tests.</summary>
     public float LeftHandError { get; private set; }
@@ -147,13 +156,18 @@ internal sealed class VrArms
         Quaternion bodyRotation, float leftHandRoll, Vector3 head)
     {
         // Only while something is held (in the prologue the arms are animated without an item; leave them alone).
-        if (!Bind(rig) || _locator.childCount == 0)
+        // The game hangs the item on the item locator, or (some spawns) on the right hand's socket.
+        if (!Bind(rig))
+            return false;
+        var onHand = _locator.childCount == 0;
+        _item = !onHand ? _locator : _handSocket != null && _handSocket.childCount > 0 ? _handSocket.GetChild(0) : null;
+        if (_item == null)
             return false;
 
         PlaceBodyUnderHead(head, bodyRotation);
 
         // The animated grip poses, relative to the weapon, before anything moves.
-        var weaponPose = new HandPose(_locator.position, _locator.rotation);
+        var weaponPose = new HandPose(_item.position, _item.rotation);
         var rightInWeapon = Relative(weaponPose, new HandPose(_rightArm.Hand.position, _rightArm.Hand.rotation));
         var leftInWeapon = Relative(weaponPose, new HandPose(_leftArm.Hand.position, _leftArm.Hand.rotation));
         GripSpan = leftInWeapon.position - rightInWeapon.position;
@@ -172,13 +186,18 @@ internal sealed class VrArms
 
         // Land the animated right-hand grip point on the controller (plus the user's fine-tuning offset).
         var weaponPosition = rightHand.position - weaponRotation * (rightInWeapon.position - gripOffset);
-        if (!_locatorMoved)
+        // An item on the locator is placed directly; one on the hand socket follows the right hand, which the arm
+        // solve below puts exactly where that item's grip must be.
+        if (!onHand)
         {
-            _locatorBasePosition = _locator.localPosition;
-            _locatorBaseRotation = _locator.localRotation;
+            if (!_locatorMoved)
+            {
+                _locatorBasePosition = _locator.localPosition;
+                _locatorBaseRotation = _locator.localRotation;
+            }
+            _locator.SetPositionAndRotation(weaponPosition, weaponRotation);
+            _locatorMoved = true;
         }
-        _locator.SetPositionAndRotation(weaponPosition, weaponRotation);
-        _locatorMoved = true;
         var placed = new HandPose(weaponPosition, weaponRotation);
         Barrel = new Ray(weaponPosition, weaponRotation * Vector3.forward);
 
@@ -198,6 +217,7 @@ internal sealed class VrArms
                 leftHand.Value.rotation * Quaternion.AngleAxis(leftHandRoll, Vector3.forward) * leftInWeapon.rotation);
         SolveArm(_leftArm, leftTarget, bodyRotation, -1f);
         LeftHandError = Vector3.Distance(_leftArm.Hand.position, leftTarget.position);
+        ItemPlacementError = Vector3.Distance(_item.position, weaponPosition) + Quaternion.Angle(_item.rotation, weaponRotation) * 0.001f;
 
         // Show where to grab while the free left hand is close to the fore-end.
         if (CanGrab && !TwoHanded)
@@ -311,6 +331,7 @@ internal sealed class VrArms
 
         _rig = rig;
         _locator = Find(rig, "ItemAttachLocator");
+        _handSocket = Find(rig, HandSocketName);
         _cameraJoint = Find(rig, "CameraJoint");
         _rigMoved = false;
         _rightArm = FindArm(rig, "Right");
@@ -329,6 +350,8 @@ internal sealed class VrArms
         var hand = lower != null ? Find(lower, side + "Hand") : null;
         return hand == null ? null : new Bone { Upper = upper, Lower = lower, Hand = hand };
     }
+
+    internal const string HandSocketName = "Socket_Right_Attach";
 
     internal static Transform Find(Transform parent, string name)
     {
@@ -363,11 +386,11 @@ internal sealed class VrArms
     {
         foreach (var name in ForeEndNames)
         {
-            var part = Find(_locator, name);
+            var part = Find(_item, name);
             if (part != null)
                 return part.position;
         }
-        var muzzle = Find(_locator, "MuzzlePos");
+        var muzzle = Find(_item, "MuzzlePos");
         if (muzzle == null)
             return leftGrip;
         var axis = weaponRotation * Vector3.forward;
