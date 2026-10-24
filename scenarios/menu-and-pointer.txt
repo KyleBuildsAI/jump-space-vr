@@ -24,6 +24,9 @@ expect cursorFree == 1
 expect laserV > 0.4
 expect laserV < 0.43
 diagnostics
+# The laser snaps to clickable elements: the game's buttons are found and the pointer sits on one.
+expect pointerTargets > 0
+expect pointerSnapped == 1
 
 # Pull the trigger: the virtual mouse clicks the button and the prologue loads.
 input right.trigger 1

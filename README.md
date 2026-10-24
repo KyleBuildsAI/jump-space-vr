@@ -3,7 +3,8 @@
 A PC VR mod for [Jump Space](https://store.steampowered.com/app/1757300/Jump_Space/) (Keepsake Games). It adds stereoscopic
 6DoF head tracking, puts the game's menus and HUD on a panel in front of you, and lets you play with VR controllers.
 
-It works with any OpenXR runtime: Virtual Desktop, SteamVR, Meta Quest Link, WMR and others.
+It works with any OpenXR runtime (Steam Link / SteamVR, Virtual Desktop, Meta Quest Link, WMR and others) and with
+Quest 3 / 3S / 2 / Pro Touch controllers, Valve Index, Windows Mixed Reality and HTC Vive controllers, or a gamepad.
 
 ## Download
 
@@ -45,9 +46,12 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
   lines the sights up with your aiming eye, and hold View/Select (Share/Create on PlayStation) for 1 s for the VR
   menu. Set `ControllerMode` to always use one or the other.
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
-  controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal.
-- **Mod menu (Insert).** An in-headset settings menu. It covers UI follow mode and size, comfort options, turning,
-  motion controls and weapon offsets.
+  controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal. The laser
+  steadies itself, snaps onto the nearest button and holds still while you pull the trigger.
+- **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
+  chair), your view stays in your character's head.
+- **Mod menu (Insert).** An in-headset settings menu, grouped into pages so everything fits: View and comfort, UI and
+  HUD, Graphics and performance, Controls, Weapon and hands, Sound and vibration.
 - **UI styles.** A flat or curved panel that stays put, eases after you, or follows your face, or a **Helmet**
   display: the HUD sits on your visor (head-locked, wide and curved, slightly lagging like a helmet HUD).
 - **Two-handed guns.** With "Weapon in hand" on, bring your left hand to the gun's fore-end (two blue rings show
@@ -102,7 +106,7 @@ update if VR stops working.
 | Input | Action |
 | --- | --- |
 | `F8` | Toggle VR on/off |
-| `Insert`, or hold the right thumbstick click for 1 s | Open/close the mod menu (arrows / left stick to navigate, Enter / A to change, B to close) |
+| `Insert`, or hold the right thumbstick click for 1 s | Open/close the mod menu (arrows / left stick to navigate, Enter / A to open a page or change a setting, Esc / B to go back, B on the first page closes) |
 | `F7`, hold the left menu button for 1 s, or click both thumbsticks | Recenter: line up your view with where the player is looking. Also happens automatically on level loads and camera changes. |
 | `F9` | Write diagnostics to `MelonLoader/Latest.log` |
 | `F10` | Save what the headset sees to `UserData/JumpSpaceVR/*.bmp` |
@@ -156,11 +160,13 @@ launch with the mod.
 | `Haptics` / `HapticStrength` | `true` / `0.7` | Controller vibration when firing (both hands when holding the gun two-handed), grabbing the fore-end and clicking menus. |
 | `HeadTrackedAudio` | `true` | Sound follows your head instead of the game camera. |
 | `HelmetUiWidth` | `1.3` | Width of the Helmet display (m). |
-| `LeftHandRoll` | `90` | Turns the free left hand for a natural rest pose (try -90 if it looks backwards). |
+| `LeftHandRoll` | `-90` | Turns the free left hand for a natural rest pose (try 90 if it looks backwards). |
 | `Dlss` | `Game` | NVIDIA DLSS for both eyes: `Game` follows the game's graphics option; `Off`, `Quality`, `Balanced`, `Performance`, `UltraPerformance` force it. At high render scales `Performance` gave about +20% frame rate in testing. |
 | `CurvedUi` | `false` | Bend the UI panel around you. |
 | `ShowCrosshair` | `false` | Show the game's crosshair on the UI panel (it doesn't line up with a gun aimed by hand). |
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
+| `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
+| `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
 
@@ -270,11 +276,11 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | Scenario | Checks |
 | --- | --- |
 | `smoke-hands.txt` (~30 s) | VR starts, the weapon fix is hooked, simulated hands are tracked where the script puts them |
-| `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits "Play Prologue"; a trigger click loads the prologue |
+| `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits and snaps onto "Play Prologue"; a trigger click loads the prologue |
 | `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick; the trigger fires; at least 45 fps |
 | `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
-| `weapon-in-hand.txt` (~2 min) | In the hangar: gun on the right controller, arms follow (hand error under 3 cm), grab the fore-end with the left hand, steer the gun with both hands, let go |
-| `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu; left stick navigates, A toggles a setting, B closes |
+| `weapon-in-hand.txt` (~2 min) | In the hangar: gun on the right controller, arms follow (hand error under 3 cm), the body stays under the head when leaning and aiming sideways, grab the fore-end with the left hand, steer the gun with both hands, let go |
+| `mod-menu.txt` (~1 min) | Holding right stick click opens the VR settings menu on its category page; A opens a category, the stick changes settings, B goes back, then closes |
 | `vr-toggle.txt` (~1 min) | F8 turns VR off and on three times; the session restarts cleanly and hands, laser and weapon fix work afterwards |
 | `hangar-options.txt` (~2 min) | Enters the hangar (gun in hand): gun drawn by the eye cameras, sights move to the right eye while aiming, view distance, frame-rate counter |
 | `ui-modes.txt` (~1 min) | Curved panel still takes laser clicks; the helmet display follows the head |
@@ -282,6 +288,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `feel-and-look.txt` (~2 min) | In the hangar: head-tracked audio updates, vibration on firing and grabbing, colour grading on/off |
 | `gamepad.txt` (~2 min) | In the hangar with a scripted gamepad: using it turns motion aim off and the view follows the camera; firing rumbles; left trigger shifts the sights; View held opens the menu; the VR controllers take over again; `Gamepad` mode keeps the pad |
 | `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
+| `first-person.txt` (~2 min) | In the hangar: normal first-person play never triggers the third-person override; "level" is the world there |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,

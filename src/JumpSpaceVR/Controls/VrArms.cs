@@ -35,9 +35,16 @@ internal sealed class VrArms
     // The game's body sits behind the camera and its arms are short (0.52 m shoulder to wrist), so a gun held where
     // players hold it is often out of reach; arms may stretch up to this factor rather than leave the hand behind.
     private const float MaxArmStretch = 1.4f;
+    // How far the body follows the player down when they duck or lean down, in meters (further and the legs would
+    // sink through the floor).
+    private const float MaxBodyDrop = 0.35f;
 
     private Transform _rig;
     private Transform _locator;
+    private Transform _cameraJoint;
+    private Vector3 _rigBasePosition;
+    private Quaternion _rigBaseRotation;
+    private bool _rigMoved;
     private Bone _rightArm;
     private Bone _leftArm;
     private Transform _highlight;
@@ -70,6 +77,12 @@ internal sealed class VrArms
     /// <summary>Fore-end grip position relative to the right-hand grip, in weapon space (meters), for tests.</summary>
     public Vector3 GripSpan { get; private set; }
 
+    /// <summary>Horizontal distance from the head to the body's camera joint after placement (meters), for tests.</summary>
+    public float BodyHeadDistance { get; private set; }
+
+    /// <summary>Yaw of the body after placement relative to the body direction (degrees), for tests.</summary>
+    public float BodyYawError { get; private set; }
+
     /// <summary>Where the weapon's barrel points after placement (world space), or null.</summary>
     public Ray? Barrel { get; private set; }
 
@@ -88,6 +101,13 @@ internal sealed class VrArms
                 bone.localPosition = position;
         }
         _savedPositions.Clear();
+
+        if (_rigMoved && _rig != null)
+        {
+            _rig.localPosition = _rigBasePosition;
+            _rig.localRotation = _rigBaseRotation;
+        }
+        _rigMoved = false;
 
         if (_locatorMoved && _locator != null)
         {
@@ -108,14 +128,17 @@ internal sealed class VrArms
 
     /// <summary>
     /// Places the weapon and arms for this frame. Hand poses are world space (position of the grip, rotation of the
-    /// aim pose); <paramref name="leftGrip"/> is the left controller's grip value.
+    /// aim pose); <paramref name="leftGrip"/> is the left controller's grip value; <paramref name="head"/> is the
+    /// world position between the eyes.
     /// </summary>
     public bool Update(Transform rig, HandPose rightHand, Quaternion rightAim, HandPose? leftHand, float leftGrip, Vector3 gripOffset,
-        Quaternion bodyRotation, float leftHandRoll)
+        Quaternion bodyRotation, float leftHandRoll, Vector3 head)
     {
         // Only while something is held (in the prologue the arms are animated without an item; leave them alone).
         if (!Bind(rig) || _locator.childCount == 0)
             return false;
+
+        PlaceBodyUnderHead(head, bodyRotation);
 
         // The animated grip poses, relative to the weapon, before anything moves.
         var weaponPose = new HandPose(_locator.position, _locator.rotation);
@@ -172,6 +195,37 @@ internal sealed class VrArms
         else
             SetHighlight(null, weaponRotation);
         return true;
+    }
+
+    /// <summary>
+    /// The game's first-person body hangs under the game camera: it bobs with the walk animation and turns with the
+    /// aim, while the VR view follows the head. Seen from the headset it sways under the player and the shoulders
+    /// clip into view when leaning or aiming to the side. Stand it upright, facing the body direction, with its camera
+    /// joint under the head (following ducks a little, never rising above the game's height).
+    /// </summary>
+    private void PlaceBodyUnderHead(Vector3 head, Quaternion bodyRotation)
+    {
+        if (_cameraJoint == null)
+            return;
+        if (!_rigMoved)
+        {
+            _rigBasePosition = _rig.localPosition;
+            _rigBaseRotation = _rig.localRotation;
+        }
+
+        var joint = _cameraJoint.position;
+        var upright = Quaternion.Euler(0f, bodyRotation.eulerAngles.y, 0f);
+        var turn = upright * Quaternion.Inverse(_rig.rotation);
+        _rig.SetPositionAndRotation(joint + turn * (_rig.position - joint), upright);
+
+        var offset = head - _cameraJoint.position;
+        offset.y = Mathf.Clamp(offset.y, -MaxBodyDrop, 0f);
+        _rig.position += offset;
+        _rigMoved = true;
+
+        var remaining = head - _cameraJoint.position;
+        BodyHeadDistance = new Vector2(remaining.x, remaining.z).magnitude;
+        BodyYawError = Mathf.DeltaAngle(bodyRotation.eulerAngles.y, _rig.eulerAngles.y);
     }
 
     private void UpdateGrabState(HandPose rightHand, Quaternion rightAim, HandPose? leftHand, float leftGrip, HandPose rightInWeapon, HandPose leftInWeapon)
@@ -242,6 +296,8 @@ internal sealed class VrArms
 
         _rig = rig;
         _locator = Find(rig, "ItemAttachLocator");
+        _cameraJoint = Find(rig, "CameraJoint");
+        _rigMoved = false;
         _rightArm = FindArm(rig, "Right");
         _leftArm = FindArm(rig, "Left");
         var ok = _locator != null && _rightArm != null && _leftArm != null;

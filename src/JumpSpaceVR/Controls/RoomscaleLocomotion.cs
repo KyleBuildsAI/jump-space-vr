@@ -51,6 +51,10 @@ internal sealed class RoomscaleLocomotion
         }
         _lastBodyPosition = bodyPosition;
         _hasLastPosition = true;
+        // Only the frame room-scale actually drove counts. Frames where it didn't run at all (gamepad in use, menu
+        // open) must not count either: a flag left set there turned the stick's running into origin shifts, and the
+        // view stayed behind while the body ran ahead.
+        _drivingLastFrame = false;
         return step;
     }
 
