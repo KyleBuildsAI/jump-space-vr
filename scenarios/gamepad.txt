@@ -59,11 +59,41 @@ expect sightShiftCm > 1
 pad lefttrigger 0
 wait 0.5
 
+# Room-scale walking, then running with the pad: the view must stay with the body, not fall behind it.
+config RoomscaleWalking true
+input right.trigger 1
+wait 0.2
+input right.trigger 0
+head 0 1.6 0.35  20 0 0
+wait 1
+pad leftstick 0 1
+wait 2.5
+pad leftstick 0 0
+wait 0.5
+expect gamepadActive == 1
+expect headLocalCm < 40
+head 0 1.6 0  20 0 0
+config RoomscaleWalking false
+recenter
+wait 1
+
 # Holding View for a second opens the VR menu; the stick moves through it. Holding it again closes it.
 pad view 1
 wait 1.3
 pad view 0
 wait 0.3
+expect modMenuOpen == 1
+# A/Cross opens the first category, B/Circle goes back to the categories.
+pad a 1
+wait 0.2
+pad a 0
+wait 0.3
+expect modMenuOnPage == 1
+pad b 1
+wait 0.2
+pad b 0
+wait 0.3
+expect modMenuOnPage == 0
 expect modMenuOpen == 1
 pad view 1
 wait 1.3
