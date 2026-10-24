@@ -46,7 +46,10 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
   lines the sights up with your aiming eye, and hold View/Select (Share/Create on PlayStation) for 1 s for the VR
   menu. Set `ControllerMode` to always use one or the other.
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
-  controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal.
+  controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal. The laser
+  steadies itself, snaps onto the nearest button and holds still while you pull the trigger.
+- **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
+  chair), your view stays in your character's head.
 - **Mod menu (Insert).** An in-headset settings menu, grouped into pages so everything fits: View and comfort, UI and
   HUD, Graphics and performance, Controls, Weapon and hands, Sound and vibration.
 - **UI styles.** A flat or curved panel that stays put, eases after you, or follows your face, or a **Helmet**
@@ -162,6 +165,8 @@ launch with the mod.
 | `CurvedUi` | `false` | Bend the UI panel around you. |
 | `ShowCrosshair` | `false` | Show the game's crosshair on the UI panel (it doesn't line up with a gun aimed by hand). |
 | `HideCinematicBars` | `true` | Hide the game's black letterbox bars in VR, where they would float in front of you. |
+| `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
+| `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
 | `ToggleVrKey`, `RecenterKey`, `DiagnosticsKey`, `SnapshotKey` | F8/F7/F9/F10 | Hotkeys. |
 
@@ -271,7 +276,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | Scenario | Checks |
 | --- | --- |
 | `smoke-hands.txt` (~30 s) | VR starts, the weapon fix is hooked, simulated hands are tracked where the script puts them |
-| `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits "Play Prologue"; a trigger click loads the prologue |
+| `menu-and-pointer.txt` (~1 min) | Main menu reached; the laser hits and snaps onto "Play Prologue"; a trigger click loads the prologue |
 | `aim-and-turn.txt` (~3 min) | In the level: the camera follows controller aim (yaw and pitch); snap turn; body-relative stick; the trigger fires; at least 45 fps |
 | `comfort.txt` (~3 min) | Walking stairs with "Stabilize view" on keeps vertical jolts low (about 7 cm/s vs 230+ off) |
 | `weapon-in-hand.txt` (~2 min) | In the hangar: gun on the right controller, arms follow (hand error under 3 cm), the body stays under the head when leaning and aiming sideways, grab the fore-end with the left hand, steer the gun with both hands, let go |
@@ -283,6 +288,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `feel-and-look.txt` (~2 min) | In the hangar: head-tracked audio updates, vibration on firing and grabbing, colour grading on/off |
 | `gamepad.txt` (~2 min) | In the hangar with a scripted gamepad: using it turns motion aim off and the view follows the camera; firing rumbles; left trigger shifts the sights; View held opens the menu; the VR controllers take over again; `Gamepad` mode keeps the pad |
 | `graphics-quality.txt` (~2 min) | VR graphics Low switches volumetrics off and Game restores it; prints frame rates per level |
+| `third-person.txt` (~2 min) | In the hangar: the game's third-person camera keeps the view in the head; the option switches it off |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 
 The steps are documented in `src/JumpSpaceVR/Testing/ScenarioRunner.cs`. They are `wait`, `waitfor`, `head`,
