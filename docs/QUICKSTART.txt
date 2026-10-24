@@ -29,6 +29,9 @@ CONTROLS
   click both sticks to recenter. Touch the VR controllers to switch back.
   F7 ... recenter     F8 ... VR on/off     F9 ... diagnostics     F10 ... save what the headset sees
 
+CO-OP
+  Friends who also have the mod see your hands move, and you see theirs. The host must have the mod too.
+
 PROBLEMS?
   - Choppy on a mid-range card (RTX 3060/4060/5060)? Insert menu > "Preset: slower graphics card",
     and set Steam Link / SteamVR to 72 or 90 Hz.

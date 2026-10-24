@@ -39,6 +39,8 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<float> HelmetUiWidth { get; }
     public MelonPreferences_Entry<float> LeftHandRoll { get; }
     public MelonPreferences_Entry<bool> HeadTrackedAudio { get; }
+    public MelonPreferences_Entry<bool> ShareHands { get; }
+    public MelonPreferences_Entry<bool> HandSyncLoopback { get; }
     public MelonPreferences_Entry<bool> Haptics { get; }
     public MelonPreferences_Entry<Rendering.ColorPreset> ColorPreset { get; }
     public MelonPreferences_Entry<float> HapticStrength { get; }
@@ -139,6 +141,10 @@ internal sealed class ModConfig
         HapticStrength = _category.CreateEntry("HapticStrength", 0.7f, "Vibration strength", "0 to 1.");
         HeadTrackedAudio = _category.CreateEntry("HeadTrackedAudio", true, "Head-tracked audio",
             "Sound follows your head: turning your head turns what you hear (the game's listener otherwise follows its camera).");
+        ShareHands = _category.CreateEntry("ShareHands", true, "Multiplayer hands",
+            "Co-op: other players with the mod see your VR hands move, and you see theirs. Works when the host has the mod too.");
+        HandSyncLoopback = _category.CreateEntry("HandSyncLoopback", false, "Hand sync loopback",
+            "Developer option: show your own shared hands on your own third-person body (tests the multiplayer hands path).");
         CurvedUi = _category.CreateEntry("CurvedUi", false, "Curved UI",
             "Bend the UI panel around you (easier to read at the edges). The Helmet follow mode is always curved.");
         ShowCrosshair = _category.CreateEntry("ShowCrosshair", false, "Show crosshair",

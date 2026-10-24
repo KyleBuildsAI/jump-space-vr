@@ -86,6 +86,18 @@ internal sealed class VrArms
     /// <summary>Where the weapon's barrel points after placement (world space), or null.</summary>
     public Ray? Barrel { get; private set; }
 
+    /// <summary>World poses of the hand bones after the last placement, for sharing with other players.</summary>
+    public bool TryGetHandBones(out HandPose left, out HandPose right)
+    {
+        left = default;
+        right = default;
+        if (_leftArm?.Hand == null || _rightArm?.Hand == null)
+            return false;
+        left = new HandPose(_leftArm.Hand.position, _leftArm.Hand.rotation);
+        right = new HandPose(_rightArm.Hand.position, _rightArm.Hand.rotation);
+        return true;
+    }
+
     /// <summary>Undoes last frame's changes (call early in the frame, before the game animates and simulates).</summary>
     public void Restore()
     {
@@ -315,7 +327,7 @@ internal sealed class VrArms
         return hand == null ? null : new Bone { Upper = upper, Lower = lower, Hand = hand };
     }
 
-    private static Transform Find(Transform parent, string name)
+    internal static Transform Find(Transform parent, string name)
     {
         for (var index = 0; index < parent.childCount; index++)
         {
