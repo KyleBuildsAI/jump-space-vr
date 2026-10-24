@@ -218,8 +218,6 @@ launch with the mod.
   "Room-scale walking" in the mod menu (experimental) to make the character follow your physical steps.
 - **Performance.** Each eye is a full HDRP render, and the game is mostly limited by the CPU in VR, so render scale
   and DLSS help less than "VR graphics" Low or Medium (shorter shadows, fewer per-eye passes) and "View distance".
-- **Gamepad and the VR menu.** With a real gamepad, the VR menu reads the pad, but the game still sees it too (A, B
-  and the sticks also act in the game while the menu is open). Pause the game first, or use the VR controllers.
 - **SteamVR overlays.** The SteamVR dashboard and overlay tools such as OVR Advanced Settings can take focus at
   startup. Close the dashboard if the game appears frozen in the headset.
 - **Partly tested on hardware.** Hours of play on a Quest 3 over Steam Link shaped most features; the newest ones

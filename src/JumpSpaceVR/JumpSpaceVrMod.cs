@@ -54,6 +54,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly ShadowBudget _shadowBudget = new();
     private readonly ComfortVignette _vignette = new();
     private readonly RealCrouch _realCrouch = new();
+    private readonly GameInputPause _gameInput = new();
     private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
@@ -532,6 +533,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "stereoWeapon" => FirstPersonRenderFix.Enabled ? 1f : 0f,
             "modMenuOpen" => _modMenu.IsOpen ? 1f : 0f,
             "modMenuOnPage" => _modMenu.PageTitle != null ? 1f : 0f,
+            "gameActionsEnabled" => GameInputPause.EnabledActionCount,
             "cursorFree" => Cursor.lockState != CursorLockMode.Locked ? 1f : 0f,
             "cutscene" => IsCutscenePlaying() ? 1f : 0f,
             "mainMenu" => GameObject.Find("PF_MainMenu/Canvas") != null ? 1f : 0f,
@@ -873,6 +875,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         if (_hotkeys.WasPressed(_config.ModMenuKey.Value))
             _modMenu.Toggle();
         _modMenu.Update(_hotkeys, _pads.GamepadActive ? _pads.MenuInput() : _lastControllerState);
+        // A real gamepad's buttons reach the game directly: hold the game's input back while the menu is open.
+        _gameInput.Update(_modMenu.IsOpen);
 
         if (_hotkeys.WasPressed(_config.SnapshotKey.Value))
             SaveSnapshots();

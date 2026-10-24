@@ -83,6 +83,8 @@ wait 1.3
 pad view 0
 wait 0.3
 expect modMenuOpen == 1
+# The game's own input is held back while the menu is open (the pad's buttons would otherwise also jump, crouch...).
+expect gameActionsEnabled == 0
 # A/Cross opens the first category, B/Circle goes back to the categories.
 pad a 1
 wait 0.2
@@ -100,6 +102,7 @@ wait 1.3
 pad view 0
 wait 0.3
 expect modMenuOpen == 0
+expect gameActionsEnabled > 0
 
 # Using the VR controllers again hands control back to them.
 input right.trigger 1
