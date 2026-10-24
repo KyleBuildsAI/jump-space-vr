@@ -123,7 +123,7 @@ internal sealed class ModConfig
             "NVIDIA DLSS for both eyes: Game follows the game's graphics settings; Quality/Balanced/Performance force it on.");
         HelmetUiWidth = _category.CreateEntry("HelmetUiWidth", 1.3f, "Helmet HUD size (m)",
             "Width of the Helmet display (it sits 0.9 m in front of your eyes).");
-        LeftHandRoll = _category.CreateEntry("LeftHandRoll", 90f, "Left hand roll (degrees)",
+        LeftHandRoll = _category.CreateEntry("LeftHandRoll", -90f, "Left hand roll (degrees)",
             "Turns the free left hand around your controller's pointing direction, for a natural rest pose.");
         ColorPreset = _category.CreateEntry("ColorPreset", Rendering.ColorPreset.Off, "Colour grading",
             "Colour grading preset on top of the game's look: Off, Vivid, Cinematic, ColdSpace, Warm, Bright, Noir.");
