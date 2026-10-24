@@ -49,6 +49,8 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly ColorGrading _colorGrading = new();
     private readonly VrUi.PointerAssist _pointerAssist = new();
     private readonly Rendering.FirstPersonOverride _firstPerson = new();
+    private readonly Tracking.ReferenceFrame _frame = new();
+    private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
     private ControllerState _rawControllerState;
@@ -414,6 +416,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             "hapticPulses" => _runtime?.Controllers.HapticPulses ?? 0,
             "gamepadActive" => _pads.GamepadActive ? 1f : 0f,
             "firstPersonOverride" => _firstPerson.Active ? 1f : 0f,
+            "frameTiltDeg" => _frame.Tilt,
             "cameraHeadDistanceCm" => _firstPerson.CameraDistance * 100f,
             "pointerTargets" => _pointerAssist.TargetCount,
             "pointerSnapped" => _pointerAssist.Snapped ? 1f : 0f,
@@ -884,9 +887,20 @@ public sealed class JumpSpaceVrMod : MelonMod
             var positional = _config.PositionalTracking.Value;
             var left = _headTracker.Localize(leftView, positional);
             var right = _headTracker.Localize(rightView, positional);
+            var playerHandler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+            var localPlayer = playerHandler != null ? playerHandler.localPlayerController : null;
+            _frame.Update(localPlayer != null ? localPlayer.transform : null);
+            _motion.Frame = _frame.Rotation;
+            if (_frame.Tilt > 30f != _frameTilted)
+            {
+                _frameTilted = !_frameTilted;
+                Log.Msg(_frameTilted
+                    ? $"Level follows your character's floor (tilted {_frame.Tilt:F0} degrees from the world)."
+                    : "Level is the world again.");
+            }
             if (_resetBodyYaw && Camera.main != null)
             {
-                _motion.Body.Reset(Camera.main.transform.eulerAngles.y);
+                _motion.Body.Reset(_frame.YawOf(Camera.main.transform.rotation));
                 _resetBodyYaw = false;
             }
             float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
@@ -902,7 +916,7 @@ public sealed class JumpSpaceVrMod : MelonMod
             var firstPersonHead = _firstPerson.Update(_config.ForceFirstPerson.Value, Camera.main, _cutscene);
             if (_cameraRig.ApplyEyes(left, right, _stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, _config.WorldScale.Value,
                     _config.LevelHorizon.Value, _config.StabilizeView.Value, FirstPersonRenderFix.LayerMask, bodyYaw,
-                    _config.ClampedViewDistance, firstPersonHead))
+                    _config.ClampedViewDistance, firstPersonHead, _frame.Rotation))
             {
                 _stereoRenderer.LeftEyeCamera = _cameraRig.LeftEye;
                 _stereoRenderer.RightEyeCamera = _cameraRig.RightEye;

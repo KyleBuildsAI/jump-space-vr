@@ -29,6 +29,8 @@ wait 2
 # First person: the camera is in the head and nothing is overridden.
 expect firstPersonOverride == 0
 expect cameraHeadDistanceCm < 60
+# Standing in the hangar, "level" is the world.
+expect frameTiltDeg < 1
 
 # The game's third-person camera (its developer switch, standing in for boosting or sitting): the view stays in the
 # head and the third-person body is hidden.

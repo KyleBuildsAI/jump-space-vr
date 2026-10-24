@@ -127,7 +127,7 @@ internal sealed class VrCameraRig
     /// </summary>
     public bool ApplyEyes(in EyeView left, in EyeView right, RenderTexture leftTarget, RenderTexture rightTarget, float worldScale,
         bool levelHorizon, bool stabilizeView, int extraCullingMask, float? bodyYaw = null, float viewDistance = 1f,
-        Vector3? positionOverride = null)
+        Vector3? positionOverride = null, Quaternion? frame = null)
     {
         if (!EnsureCameras())
             return false;
@@ -144,9 +144,11 @@ internal sealed class VrCameraRig
         // Letting the game's camera pitch and roll the headset view is a major cause of VR sickness; with
         // levelling on, only the game's yaw turns your view and your head does all looking up and down.
         // With motion controls the body yaw is owned by the mod, so aiming the gun never turns the view.
+        // "Level" is the character's floor (see ReferenceFrame), so a rolling ship doesn't spin the interior around you.
+        var level = frame ?? Quaternion.identity;
         var viewRotation = bodyYaw.HasValue
-            ? Quaternion.Euler(0f, bodyYaw.Value, 0f)
-            : levelHorizon ? Quaternion.Euler(0f, baseRotation.eulerAngles.y, 0f) : baseRotation;
+            ? level * Quaternion.Euler(0f, bodyYaw.Value, 0f)
+            : levelHorizon ? level * Quaternion.Euler(0f, Tracking.ReferenceFrame.YawIn(level, baseRotation), 0f) : baseRotation;
         ViewRotation = viewRotation;
 
         PlaceEye(_rightEye.transform, basePosition, viewRotation, right, worldScale);
