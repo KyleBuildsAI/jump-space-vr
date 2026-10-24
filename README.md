@@ -48,7 +48,7 @@ Uninstall: double-click `Uninstall.bat`. Older versions and release notes:
 - **Laser pointer in menus.** When the game shows a mouse cursor (menus, inventory, pause), point your right
   controller at the UI panel and pull the trigger to click. During gameplay the trigger fires as normal. The laser
   steadies itself, snaps onto the nearest button and holds still while you pull the trigger.
-- **Co-op hands (new, needs testing with friends).** Players who all run the mod see each other's VR hands move:
+- **Co-op hands (0.9.0 pre-release, needs testing with friends).** Players who all run the mod see each other's VR hands move:
   arms reach where the other player's controllers are, including holding the gun with two hands. The host needs
   the mod too; players without it see the normal game. Turn it off with "Multiplayer hands (co-op)".
 - **Always first person.** When the game swings its camera out to third person (boosting in space, sitting in a
