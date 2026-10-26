@@ -38,6 +38,9 @@ internal sealed class BodyTurning
 
     public Quaternion Rotation => Quaternion.Euler(0f, Yaw, 0f);
 
+    /// <summary>Turns the body by <paramref name="degrees"/> (body follows head).</summary>
+    public void Turn(float degrees) => Yaw = Mathf.Repeat(Yaw + degrees, 360f);
+
     public void Reset(float yaw)
     {
         Yaw = yaw;

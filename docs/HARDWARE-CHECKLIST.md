@@ -26,6 +26,15 @@ snapshots.
 - [ ] **Real crouch** (optional): ducking crouches, view stays at your head height; recenter while standing
 - [ ] **Weapon in hand** after spawning aboard a ship (the gun on the hand socket)
 
+## From the Discord video feedback (0.12.0)
+
+- [ ] **Look to interact**: gun pointed down, look at a button / weapon / grapple point; the "press X" prompt shows
+      and X uses what you look at
+- [ ] **Body follows head**: turn your head to the side; the character turns with you, walking goes where you face,
+      the view doesn't jump
+- [ ] **Left shoulder**: with the left hand free (down at your side or out), the shoulder doesn't hunch into view
+- [ ] **Recording**: record the game window; no black bands at the edges
+
 ## Co-op hands (beta)
 
 - [ ] You, a friend and the host (all with the mod) turn on "Multiplayer hands (co-op)"; each sees the others'

@@ -21,6 +21,7 @@ CONTROLS
   Left grip at the gun's front (Weapon in hand on) ... hold the gun with both hands
   Left menu button ........ pause (hold 1 s to recenter your view)
   In menus ................ point at the screen and pull the trigger to click
+  Gun pointed down ........ the game looks where you look: press X to use what you look at
 
   Insert (or hold right thumbstick click 1 s) ... VR settings menu
 

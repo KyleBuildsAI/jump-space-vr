@@ -57,6 +57,20 @@ internal sealed class HeadTracker
     /// Re-expresses an eye view (tracking space) relative to the recentered origin. With positional
     /// tracking off, head translation is removed but the eye's offset from the head (IPD) is kept.
     /// </summary>
+    /// <summary>
+    /// Turns the recentered frame by <paramref name="degrees"/> of yaw. Paired with turning the body by the same angle,
+    /// the view stays exactly where it is while the body turns underneath it (body follows head).
+    /// </summary>
+    public void TurnOrigin(float degrees)
+    {
+        if (!_hasOrigin)
+            return;
+        var turn = Quaternion.Euler(0f, -degrees, 0f);
+        _originYawInverse = turn * _originYawInverse;
+        LocalPosition = turn * LocalPosition;
+        LocalRotation = turn * LocalRotation;
+    }
+
     public EyeView Localize(in EyeView raw, bool positionalTracking)
     {
         var localized = raw;

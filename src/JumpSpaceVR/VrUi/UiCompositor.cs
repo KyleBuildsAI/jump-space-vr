@@ -274,6 +274,9 @@ internal sealed class UiCompositor
         }
     }
 
+    // Share of the eye image's width/height the desktop view may use at most.
+    private const float MirrorVisibleFraction = 0.86f;
+
     /// <summary>Desktop view: centre crop of the left eye with the UI on top.</summary>
     private void DrawDesktopMirror()
     {
@@ -281,10 +284,16 @@ internal sealed class UiCompositor
         if (leftEye == null || !EnsureResources())
             return;
 
+        // Keep the eye image's outer edges out of the desktop view (and so out of recordings): in a real headset they
+        // can show black (the edge of the rendered field of view, cinematic transitions), which recordings showed as
+        // a black box around the picture. The centre is what the player looks at anyway.
         var screenAspect = (float)Screen.width / Mathf.Max(1, Screen.height);
         var eyeAspect = (float)leftEye.width / Mathf.Max(1, leftEye.height);
-        var visibleHeight = Mathf.Clamp01(eyeAspect / screenAspect);
-        Graphics.Blit(leftEye, (RenderTexture)null, new Vector2(1f, visibleHeight), new Vector2(0f, (1f - visibleHeight) * 0.5f));
+        var visibleWidth = MirrorVisibleFraction;
+        var visibleHeight = Mathf.Min(MirrorVisibleFraction, visibleWidth * eyeAspect / screenAspect);
+        visibleWidth = visibleHeight * screenAspect / eyeAspect;
+        Graphics.Blit(leftEye, (RenderTexture)null, new Vector2(visibleWidth, visibleHeight),
+            new Vector2((1f - visibleWidth) * 0.5f, (1f - visibleHeight) * 0.5f));
         if (_hasUiFrame)
             Graphics.Blit(_uiTexture, (RenderTexture)null, _panelMaterial);
     }

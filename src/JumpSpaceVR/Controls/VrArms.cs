@@ -38,6 +38,7 @@ internal sealed class VrArms
     // How far the body follows the player down when they duck or lean down, in meters (further and the legs would
     // sink through the floor).
     private const float MaxBodyDrop = 0.35f;
+    private static readonly Vector3 EyeToCameraJoint = new(0f, -0.03f, -0.10f);
 
     private Transform _rig;
     private Transform _locator;
@@ -79,6 +80,20 @@ internal sealed class VrArms
     /// for tests: an item on the hand socket only gets there through the arm solve.
     /// </summary>
     public float ItemPlacementError { get; private set; }
+
+    /// <summary>
+    /// Smallest distance from the eyes to a shoulder or upper arm after the last placement (meters), for tests:
+    /// anything much closer than ~0.2 m clips through the eye cameras' near plane.
+    /// </summary>
+    public float ShoulderClearance { get; private set; }
+
+    private static float Clearance(Bone arm, Vector3 head)
+    {
+        var shoulder = arm.Upper.parent != null ? arm.Upper.parent.position : arm.Upper.position;
+        var upperArmMiddle = (arm.Upper.position + arm.Lower.position) * 0.5f;
+        return Mathf.Min(Vector3.Distance(head, shoulder), Mathf.Min(Vector3.Distance(head, arm.Upper.position),
+            Vector3.Distance(head, upperArmMiddle)));
+    }
 
     /// <summary>Distance from the left hand bone to its target after the last solve (meters), for tests.</summary>
     public float LeftHandError { get; private set; }
@@ -167,7 +182,11 @@ internal sealed class VrArms
         PlaceBodyUnderHead(head, bodyRotation);
 
         // The animated grip poses, relative to the weapon, before anything moves.
-        var weaponPose = new HandPose(_item.position, _item.rotation);
+        // The item locator is the weapon's reference frame in both cases: it is still animated when the item hangs on
+        // the hand socket, while the item's own pivot there is oriented differently (using it made the gun point off
+        // the controller and moved the fore-end grab point).
+        var weaponPose = new HandPose(_locator.position, _locator.rotation);
+        var itemInWeapon = Relative(weaponPose, new HandPose(_item.position, _item.rotation));
         var rightInWeapon = Relative(weaponPose, new HandPose(_rightArm.Hand.position, _rightArm.Hand.rotation));
         var leftInWeapon = Relative(weaponPose, new HandPose(_leftArm.Hand.position, _leftArm.Hand.rotation));
         GripSpan = leftInWeapon.position - rightInWeapon.position;
@@ -215,9 +234,16 @@ internal sealed class VrArms
             ? Absolute(placed, leftInWeapon)
             : new HandPose(leftHand.Value.position,
                 leftHand.Value.rotation * Quaternion.AngleAxis(leftHandRoll, Vector3.forward) * leftInWeapon.rotation);
+        // A free left hand also turns its clavicle toward the hand: the animation holds that shoulder raised and
+        // forward for a two-handed grip, so with the arm hanging down it stayed hunched up by the face (players saw
+        // the left shoulder detached from the arm and clipping into the view).
+        if (!leftOnWeapon)
+            TurnClavicle(_leftArm, leftTarget.position);
         SolveArm(_leftArm, leftTarget, bodyRotation, -1f);
         LeftHandError = Vector3.Distance(_leftArm.Hand.position, leftTarget.position);
-        ItemPlacementError = Vector3.Distance(_item.position, weaponPosition) + Quaternion.Angle(_item.rotation, weaponRotation) * 0.001f;
+        var expectedItem = Absolute(placed, itemInWeapon);
+        ItemPlacementError = Vector3.Distance(_item.position, expectedItem.position) + Quaternion.Angle(_item.rotation, expectedItem.rotation) * 0.001f;
+        ShoulderClearance = Mathf.Min(Clearance(_leftArm, head), Clearance(_rightArm, head));
 
         // Show where to grab while the free left hand is close to the fore-end.
         if (CanGrab && !TwoHanded)
@@ -252,13 +278,16 @@ internal sealed class VrArms
         _rig.SetPositionAndRotation(joint + turn * (_rig.position - joint), bodyRotation);
 
         var up = bodyRotation * Vector3.up;
-        var offset = head - _cameraJoint.position;
+        // Eyes sit in front of the shoulders: keep the body a little behind and below the head, so its shoulder pads
+        // and collar stay out of the eye cameras when looking down or to the side (players saw the left shoulder
+        // clip into the view).
+        var offset = head + bodyRotation * EyeToCameraJoint - _cameraJoint.position;
         var rise = Vector3.Dot(offset, up);
         offset += up * (Mathf.Clamp(rise, -MaxBodyDrop, 0f) - rise);
         _rig.position += offset;
         _rigMoved = true;
 
-        var remaining = head - _cameraJoint.position;
+        var remaining = head + bodyRotation * EyeToCameraJoint - _cameraJoint.position;
         BodyHeadDistance = (remaining - up * Vector3.Dot(remaining, up)).magnitude;
         BodyYawError = Quaternion.Angle(bodyRotation, _rig.rotation);
     }
@@ -286,6 +315,29 @@ internal sealed class VrArms
         else if (TwoHanded && Vector3.Distance(leftHand.Value.position, rightHand.position) > ReleaseRadius + Vector3.Distance(foreEnd, rightHand.position))
             TwoHanded = false;
     }
+
+    private const float ClavicleShare = 0.35f;
+    private const float MaxClavicleTurn = 30f;
+
+    /// <summary>Turns the clavicle part of the way (and at most <see cref="MaxClavicleTurn"/>) toward the hand target.</summary>
+    private void TurnClavicle(Bone arm, Vector3 target)
+    {
+        var clavicle = arm.Upper.parent;
+        if (clavicle == null)
+            return;
+        Save(clavicle);
+        var full = Quaternion.FromToRotation(arm.Upper.position - clavicle.position, target - clavicle.position);
+        var partial = Quaternion.Slerp(Quaternion.identity, full, ClavicleShare);
+        var angle = Quaternion.Angle(Quaternion.identity, partial);
+        if (angle > MaxClavicleTurn)
+            partial = Quaternion.Slerp(Quaternion.identity, partial, MaxClavicleTurn / angle);
+        clavicle.rotation = partial * clavicle.rotation;
+    }
+
+    /// <summary>Height of the left shoulder joint above the right one (meters, for tests).</summary>
+    public float ShoulderTilt => _leftArm?.Upper != null && _rightArm?.Upper != null && _rig != null
+        ? Vector3.Dot(_leftArm.Upper.position - _rightArm.Upper.position, _rig.up)
+        : 0f;
 
     private void SolveArm(Bone arm, HandPose target, Quaternion bodyRotation, float side)
     {
@@ -352,6 +404,7 @@ internal sealed class VrArms
     }
 
     internal const string HandSocketName = "Socket_Right_Attach";
+
 
     internal static Transform Find(Transform parent, string name)
     {

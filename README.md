@@ -35,6 +35,10 @@ What changed: [CHANGELOG](CHANGELOG.md). What still needs checking in a headset:
   controller points, so firing and co-op aim replication work natively. The right stick snap-turns (45°) or
   smooth-turns your body; the left stick moves relative to your body. The first-person weapon is placed in your
   right hand at the game's item attach point.
+- **Look to interact.** Lower the gun (point it down) and the game looks where you look: "press X" prompts,
+  pickups, buttons and grapple points follow your eyes. Raise the gun or pull the trigger to aim with it again.
+- **Body follows head.** Turn your head well to one side and your character turns with you, so walking goes where
+  you face and the right stick is needed less. Your view never moves on its own.
 - **VR controllers as a gamepad.** Everything else maps to an Xbox-style gamepad, so every gamepad action works:
   - Left stick moves, and stick clicks map to L3/R3.
   - Triggers map to the triggers.
@@ -182,6 +186,8 @@ launch with the mod.
 | `PointerAssist` | `true` | The laser steadies itself, snaps onto the nearest button and holds still while you pull the trigger. |
 | `ComfortVignette` | `Off` | Darken the edges of the view while the stick moves or turns you: `Off`, `Low`, `Medium`, `High`. |
 | `RealCrouch` | `false` | Duck in your room to crouch in the game (on foot only); recenter while standing. |
+| `LookToInteract` | `true` | With the gun lowered or nothing in hand, the game looks where you look (prompts and interaction follow your eyes). |
+| `BodyFollowsHead` | `true` | Turning your head more than about 35° turns your character with you; the view stays put. |
 | `ForceFirstPerson` | `true` | Keep the view in your character's head when the game switches to a third-person camera. |
 | `ShareHands` | `false` | Co-op (beta): send your VR hands to other modded players and show theirs (the host needs the mod with this on). |
 | `OpenXRRuntimeJson` | empty | Force a specific OpenXR runtime manifest instead of the system default. |
@@ -309,6 +315,7 @@ powershell -ExecutionPolicy Bypass -File scripts\dev\run-all-scenarios.ps1
 | `galaxy-map.txt` (~2 min) | In the hangar: the galaxy map is shown at its camera's 60-degree downward angle; motion aim steps aside so the sticks steer the map; leaving restores the normal view |
 | `comfort-vignette.txt` (~2 min) | In the hangar: walking and smooth turning darken the view's edges, standing still and head movement don't, Off never does |
 | `real-crouch.txt` (~2 min) | In the hangar: ducking 45 cm crouches the character and the eyes drop ~45 cm, not the game's extra crouch drop on top; standing up stands; off does nothing |
+| `look-and-turn.txt` (~2 min) | In the hangar: with the gun lowered the game looks where the head looks, the trigger or raising the gun aims with the gun; turning the head 70 degrees turns the body after it while the view moves only with the head |
 | `first-person.txt` (~2 min) | In the hangar: normal first-person play never triggers the third-person override; "level" is the world there |
 | `soak.txt` (~18 min) | 15 minutes walking and turning in the level: frame rate above 45, no frame over 100 ms, memory printed per lap (measured 91-95 fps, worst 22 ms, 5.0-5.15 GB with no steady growth) |
 

@@ -17,6 +17,8 @@ namespace JumpSpaceVR.Testing;
 ///   wait 2.5                                  seconds
 ///   waitfor inLevel == 1 120                  metric, operator, value, timeout seconds
 ///   head x y z pitch yaw roll                 meters / degrees, tracking space
+///   target Toilet                             pick the nearest interactable of a type (onTarget, targetYaw...)
+///   headlook targetYaw targetPitch            turn the head to angles the mod measures (relative to the body)
 ///   hand right x y z pitch yaw roll           grip and aim pose of one hand
 ///   input right.trigger 1                     see ConformanceInputDriver for names; sticks take two values
 ///   key 0x0D                                  virtual-key code sent to the game window
@@ -27,6 +29,8 @@ namespace JumpSpaceVR.Testing;
 ///                                             a/b/x/y/start/view 0|1, release (see TestGamepad)
 ///   print fps cpuMainMs                       log metric values without checking them
 ///   galaxymap                                 open the galaxy map as if the player used its terminal
+///   tree PF_GUI/FullScreenGUI/PF_FirstPersonHUD    log a scene object's children (active state, depth 4)
+///   eyeshot                                   save the left eye's render texture directly (eye-left-*.bmp)
 ///   itemtohand                                hang the held item on the right hand's socket (as some spawns do)
 ///   snapshot | diagnostics | recenter | log text | quit
 /// </summary>
@@ -147,6 +151,15 @@ internal sealed class ScenarioRunner
                 case "head":
                     _mock.SetHead(Vector(parts, 1), Rotation(parts, 4));
                     break;
+                case "headlook":
+                {
+                    // Turn the head toward something the mod measures: headlook <yawMetric> <pitchMetric> (degrees).
+                    var yaw = _metric(parts[1]) ?? throw new ArgumentException($"no value for {parts[1]}");
+                    var pitch = _metric(parts[2]) ?? throw new ArgumentException($"no value for {parts[2]}");
+                    _mock.SetHead(new Vector3(0f, 1.6f, 0f), Quaternion.Euler(pitch, yaw, 0f));
+                    Log.Msg($"[scenario] headlook yaw {yaw:0.#} pitch {pitch:0.#}");
+                    break;
+                }
                 case "hand":
                     var right = parts[1].Equals("right", StringComparison.OrdinalIgnoreCase);
                     var position = Vector(parts, 2);
@@ -185,6 +198,18 @@ internal sealed class ScenarioRunner
                 case "pad":
                     _command($"pad {parts[1]} {(parts.Length > 2 ? parts[2] : "0")} {(parts.Length > 3 ? parts[3] : "0")}");
                     break;
+                case "target":
+                    _command($"target {parts[1]}");
+                    break;
+                case "hide":
+                    _command($"hide {step.Substring(5).Trim()}");
+                    break;
+                case "tree":
+                    _command($"tree {step.Substring(5).Trim()}");
+                    break;
+                case "interactables":
+                case "near":
+                case "eyeshot":
                 case "itemtohand":
                 case "galaxymap":
                 case "rig":
