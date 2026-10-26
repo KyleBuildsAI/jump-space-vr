@@ -3,6 +3,15 @@
 All notable changes to Jump Space VR. Versions follow [semantic versioning](https://semver.org/); downloads are on
 the [Releases](https://github.com/KyleBuildsAI/jump-space-vr/releases) page.
 
+## 0.12.1
+
+- **Weapon in hand**: when the game hangs the gun on the right hand's socket (often the first hangar visit after
+  playing the prologue), the gun now points along the controller instead of lying sideways in the hand, and the left
+  hand can take the fore-end again for a two-handed hold.
+- Test harness: before/after checks that prompts follow the head at a grapple point, the galaxy map and an airlock
+  panel; the gun-on-socket checks now hold the gun on the socket the way the game does, and check where the gun model
+  itself points.
+
 ## 0.12.0
 
 From player feedback on the first public video (thanks!):

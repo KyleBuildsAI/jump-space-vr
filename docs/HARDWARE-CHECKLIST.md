@@ -24,7 +24,8 @@ snapshots.
 - [ ] **Menu**: category pages, gamepad doesn't move the character while the menu is open
 - [ ] **Comfort vignette** (optional): darkens only with stick movement and turning
 - [ ] **Real crouch** (optional): ducking crouches, view stays at your head height; recenter while standing
-- [ ] **Weapon in hand** after spawning aboard a ship (the gun on the hand socket)
+- [ ] **Weapon in hand** with the gun on the hand socket (often the first hangar visit after the prologue): the gun
+  points along the controller and the left hand can take the fore-end
 
 ## From the Discord video feedback (0.12.0)
 
