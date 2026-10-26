@@ -182,7 +182,11 @@ internal sealed class VrArms
         PlaceBodyUnderHead(head, bodyRotation);
 
         // The animated grip poses, relative to the weapon, before anything moves.
-        var weaponPose = new HandPose(_item.position, _item.rotation);
+        // The item locator is the weapon's reference frame in both cases: it is still animated when the item hangs on
+        // the hand socket, while the item's own pivot there is oriented differently (using it made the gun point off
+        // the controller and moved the fore-end grab point).
+        var weaponPose = new HandPose(_locator.position, _locator.rotation);
+        var itemInWeapon = Relative(weaponPose, new HandPose(_item.position, _item.rotation));
         var rightInWeapon = Relative(weaponPose, new HandPose(_rightArm.Hand.position, _rightArm.Hand.rotation));
         var leftInWeapon = Relative(weaponPose, new HandPose(_leftArm.Hand.position, _leftArm.Hand.rotation));
         GripSpan = leftInWeapon.position - rightInWeapon.position;
@@ -237,7 +241,8 @@ internal sealed class VrArms
             TurnClavicle(_leftArm, leftTarget.position);
         SolveArm(_leftArm, leftTarget, bodyRotation, -1f);
         LeftHandError = Vector3.Distance(_leftArm.Hand.position, leftTarget.position);
-        ItemPlacementError = Vector3.Distance(_item.position, weaponPosition) + Quaternion.Angle(_item.rotation, weaponRotation) * 0.001f;
+        var expectedItem = Absolute(placed, itemInWeapon);
+        ItemPlacementError = Vector3.Distance(_item.position, expectedItem.position) + Quaternion.Angle(_item.rotation, expectedItem.rotation) * 0.001f;
         ShoulderClearance = Mathf.Min(Clearance(_leftArm, head), Clearance(_rightArm, head));
 
         // Show where to grab while the free left hand is close to the fore-end.

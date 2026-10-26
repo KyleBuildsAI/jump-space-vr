@@ -233,13 +233,6 @@ internal sealed class MotionControls
                     _aimTarget = Arms.Barrel.Value.origin + Arms.Barrel.Value.direction * AimConvergenceDistance;
             }
         }
-
-        // Look to interact: blend the game's look from the gun toward the player's gaze while the gun is lowered.
-        if (GazeWeight > 0f)
-        {
-            var gazeTarget = head + gaze * Vector3.forward * AimConvergenceDistance;
-            _aimTarget = Vector3.Lerp(_aimTarget, gazeTarget, GazeWeight);
-        }
         else
         {
             Arms.Idle();
@@ -247,6 +240,13 @@ internal sealed class MotionControls
                 ShiftWeapon(sightShift);
             else
                 RestoreWeapon();
+        }
+
+        // Look to interact: blend the game's look from the gun toward the player's gaze while the gun is lowered.
+        if (GazeWeight > 0f)
+        {
+            var gazeTarget = head + gaze * Vector3.forward * AimConvergenceDistance;
+            _aimTarget = Vector3.Lerp(_aimTarget, gazeTarget, GazeWeight);
         }
     }
 
