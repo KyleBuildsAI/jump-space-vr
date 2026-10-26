@@ -196,7 +196,7 @@ internal sealed class MotionControls
     /// </param>
     public void UpdatePose(Vector3 viewOrigin, Quaternion viewRotation, in TrackedPose hand, in TrackedPose pointer,
         in TrackedPose leftHand, in TrackedPose leftPointer, float leftGrip, float worldScale, Vector3 weaponOffset, bool moveWeapon,
-        Vector3 sightShift, float leftHandRoll, Vector3 head)
+        Vector3 sightShift, float leftHandRoll, Vector3 head, Quaternion gaze, float trigger, bool lookToInteract)
     {
         if (!IsActive || !pointer.IsValid)
         {
@@ -210,6 +210,7 @@ internal sealed class MotionControls
         var pointerRotation = viewRotation * pointer.Rotation * DebugPointerRotation;
         _aimTarget = pointerPosition + pointerRotation * Vector3.forward * AimConvergenceDistance;
         _hasAimTarget = true;
+        UpdateGazeWeight(pointerRotation * Vector3.forward, viewRotation * Vector3.up, trigger, lookToInteract);
 
         if (moveWeapon && hand.IsValid)
         {
@@ -232,6 +233,13 @@ internal sealed class MotionControls
                     _aimTarget = Arms.Barrel.Value.origin + Arms.Barrel.Value.direction * AimConvergenceDistance;
             }
         }
+
+        // Look to interact: blend the game's look from the gun toward the player's gaze while the gun is lowered.
+        if (GazeWeight > 0f)
+        {
+            var gazeTarget = head + gaze * Vector3.forward * AimConvergenceDistance;
+            _aimTarget = Vector3.Lerp(_aimTarget, gazeTarget, GazeWeight);
+        }
         else
         {
             Arms.Idle();
@@ -241,6 +249,55 @@ internal sealed class MotionControls
                 RestoreWeapon();
         }
     }
+
+    // The gun counts as lowered when it points this far below level (hysteresis: raised again above RaisedPitch).
+    private const float LoweredPitch = -40f;
+    private const float RaisedPitch = -30f;
+    private const float GazeBlendInSeconds = 0.25f;
+    private const float GazeBlendOutSeconds = 0.1f;
+    private bool _lowered;
+
+    /// <summary>
+    /// How much the game's look follows the player's gaze instead of the gun (0 = gun, 1 = gaze). The game picks
+    /// interaction targets and shows prompts ("press X to grapple") where its camera looks; with motion aiming that
+    /// was wherever the gun pointed, so players had to point the gun at buttons and never saw prompts for what they
+    /// looked at. With the gun lowered (or nothing held) the look follows the gaze; raising it or pulling the trigger
+    /// hands the look straight back to the gun.
+    /// </summary>
+    public float GazeWeight { get; private set; }
+
+    private void UpdateGazeWeight(Vector3 gunForward, Vector3 up, float trigger, bool enabled)
+    {
+        var pitch = Mathf.Asin(Mathf.Clamp(Vector3.Dot(gunForward, up), -1f, 1f)) * Mathf.Rad2Deg;
+        if (pitch < LoweredPitch)
+            _lowered = true;
+        else if (pitch > RaisedPitch)
+            _lowered = false;
+
+        var firing = trigger > 0.2f;
+        var wantGaze = enabled && !firing && !Arms.TwoHanded && (_lowered || !HoldsItemCached());
+        if (firing || !enabled)
+        {
+            GazeWeight = 0f;
+            return;
+        }
+        var seconds = wantGaze ? GazeBlendInSeconds : GazeBlendOutSeconds;
+        GazeWeight = Mathf.MoveTowards(GazeWeight, wantGaze ? 1f : 0f, Time.unscaledDeltaTime / seconds);
+    }
+
+    // HoldsItem walks the rig; a few times a second is plenty for choosing the look source.
+    private bool HoldsItemCached()
+    {
+        if (Time.frameCount >= _holdsItemCheckFrame)
+        {
+            _holdsItemCheckFrame = Time.frameCount + 15;
+            _holdsItemCached = HoldsItem;
+        }
+        return _holdsItemCached;
+    }
+
+    private int _holdsItemCheckFrame;
+    private bool _holdsItemCached;
 
     private void ShiftWeapon(Vector3 worldShift)
     {

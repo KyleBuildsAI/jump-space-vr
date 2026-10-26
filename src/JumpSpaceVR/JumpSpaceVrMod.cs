@@ -55,6 +55,7 @@ public sealed class JumpSpaceVrMod : MelonMod
     private readonly ComfortVignette _vignette = new();
     private readonly RealCrouch _realCrouch = new();
     private readonly GameInputPause _gameInput = new();
+    private readonly BodyFollowsHead _bodyFollow = new();
     private bool _frameTilted;
     private float _aimDownSights;
     private Vector3 _lastSightShift;
@@ -234,6 +235,8 @@ public sealed class JumpSpaceVrMod : MelonMod
         _modMenu.AddChoice("Controls (VR controllers or gamepad)", _config.ControllerMode);
         _modMenu.AddToggle("Motion controls (aim with hand)", _config.MotionControls);
         _modMenu.AddChoice("Turn mode", _config.TurnMode);
+        _modMenu.AddToggle("Body follows head", _config.BodyFollowsHead);
+        _modMenu.AddToggle("Look to interact (gun lowered)", _config.LookToInteract);
         _modMenu.AddNumber("Snap turn angle", _config.SnapTurnAngle, 15f, 15f, 90f, "0");
         _modMenu.AddNumber("Smooth turn speed", _config.SmoothTurnSpeed, 15f, 30f, 360f, "0");
         _modMenu.AddToggle("Laser pointer in menus", _config.LaserPointer);
@@ -324,6 +327,9 @@ public sealed class JumpSpaceVrMod : MelonMod
     private void SaveSnapshots()
     {
         EyeSnapshot.SaveSingle(_uiCompositor.UiTexture, "ui");
+        // The eye images as rendered (the swapchain capture below can lag behind on some runtimes).
+        if (_stereoRenderer.LeftTexture != null && _stereoRenderer.RightTexture != null)
+            EyeSnapshot.Save(_stereoRenderer.LeftTexture, _stereoRenderer.RightTexture, "eye");
         _stereoRenderer.CaptureSubmittedFrame((left, right) => EyeSnapshot.Save(left, right, "headset", flipVertical: true));
     }
 
@@ -518,6 +524,8 @@ public sealed class JumpSpaceVrMod : MelonMod
                 : null,
             "locatorChildren" => _motion.ItemSlots.Locator,
             "socketChildren" => _motion.ItemSlots.Socket,
+            "shoulderTiltCm" => _motion.WeaponInHand ? _motion.Arms.ShoulderTilt * 100f : null,
+            "shoulderClearanceCm" => _motion.WeaponInHand ? _motion.Arms.ShoulderClearance * 100f : null,
             "itemPlaceErrorCm" => _motion.WeaponInHand ? _motion.Arms.ItemPlacementError * 100f : null,
             "gripHighlight" => GameObject.Find("JumpSpaceVR_GripHighlight") != null ? 1f : 0f,
             "twoHanded" => _motion.Arms.TwoHanded ? 1f : 0f,
@@ -536,6 +544,23 @@ public sealed class JumpSpaceVrMod : MelonMod
             "stereoWeapon" => FirstPersonRenderFix.Enabled ? 1f : 0f,
             "modMenuOpen" => _modMenu.IsOpen ? 1f : 0f,
             "modMenuOnPage" => _modMenu.PageTitle != null ? 1f : 0f,
+            "gazeAim" => _motion.GazeWeight,
+            // The interactable picked with "target <type>": whether the game would use it now, and where it is
+            // relative to the body (for headlook).
+            "onTarget" => _testTarget != null && InteractionTarget() is { } current &&
+                current.GetInstanceID() == _testTarget.GetInstanceID() ? 1f : 0f,
+            "hasInteractTarget" => InteractionTarget() != null ? 1f : 0f,
+            "targetYaw" => TargetDirection() is { } toTarget
+                ? Mathf.DeltaAngle(_motion.Body.Yaw, _frame.YawOf(Quaternion.LookRotation(toTarget)))
+                : null,
+            "targetDistance" => TargetDirection()?.magnitude,
+            "targetPitch" => TargetDirection() is { } toTarget2
+                ? -Mathf.Asin(Mathf.Clamp(toTarget2.normalized.y, -1f, 1f)) * Mathf.Rad2Deg
+                : null,
+            // The right eye keeps its rendered (headset) pose between frames; the left eye is the game camera.
+            "eyeYaw" => _cameraRig.RightEye != null ? _cameraRig.RightEye.transform.eulerAngles.y : null,
+            "bodyFollowing" => _bodyFollow.Turning ? 1f : 0f,
+            "headYawLocal" => Mathf.DeltaAngle(0f, _headTracker.LocalRotation.eulerAngles.y),
             "gameActionsEnabled" => GameInputPause.EnabledActionCount,
             "cursorFree" => Cursor.lockState != CursorLockMode.Locked ? 1f : 0f,
             "cutscene" => IsCutscenePlaying() ? 1f : 0f,
@@ -597,6 +622,141 @@ public sealed class JumpSpaceVrMod : MelonMod
         terminals[0].OnInteractionPredicted(player);
     }
 
+    /// <summary>Test scenarios: logs a scene object's children (name, active, scale) to find HUD parts.</summary>
+    private static void LogTree(string path)
+    {
+        var root = GameObject.Find(path);
+        if (root == null)
+            throw new InvalidOperationException($"no object '{path}'");
+        var text = new System.Text.StringBuilder($"Tree of {path}:");
+        AppendTree(text, root.transform, 0);
+        Log.Msg(text.ToString());
+    }
+
+    private static void AppendTree(System.Text.StringBuilder text, Transform node, int depth)
+    {
+        text.AppendLine().Append(' ', depth * 2).Append(node.name)
+            .Append(node.gameObject.activeSelf ? "" : " (inactive)")
+            .Append(node.localScale == Vector3.one ? "" : $" scale={node.localScale}");
+        if (depth >= 4)
+            return;
+        for (var index = 0; index < node.childCount; index++)
+            AppendTree(text, node.GetChild(index), depth + 1);
+    }
+
+    /// <summary>Test scenarios: logs the visible renderers within 40 cm of the eyes (what can clip into the view).</summary>
+    private void LogRenderersNearEyes()
+    {
+        var eye = _cameraRig.RightEye != null ? _cameraRig.RightEye.transform.position : Vector3.zero;
+        var text = new System.Text.StringBuilder($"Renderers near the eyes at {eye}:");
+        var renderers = UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        for (var index = 0; index < renderers.Length; index++)
+        {
+            var renderer = renderers[index];
+            if (renderer == null || !renderer.enabled || !renderer.gameObject.activeInHierarchy)
+                continue;
+            var bounds = renderer.bounds;
+            var distance = Vector3.Distance(bounds.ClosestPoint(eye), eye);
+            if (distance > 0.6f)
+                continue;
+            var path = Diagnostics.PathOf(renderer.transform);
+            if (!path.Contains("PF_PlayerCharacter", StringComparison.Ordinal))
+                continue;
+            var shadows = (int)renderer.shadowCastingMode;
+            text.AppendLine().Append("  ").Append(distance.ToString("F2")).Append(" m layer=")
+                .Append(renderer.gameObject.layer).Append(" shadowMode=").Append(shadows).Append(' ')
+                .Append(path.Length > 90 ? path.Substring(path.Length - 90) : path);
+        }
+        Log.Msg(text.ToString());
+    }
+
+    /// <summary>Test scenarios: switches off visible renderers whose path contains the text (to identify geometry).</summary>
+    private static void HideRenderers(string pathPart)
+    {
+        var count = 0;
+        var renderers = UnityEngine.Object.FindObjectsByType<Renderer>(FindObjectsSortMode.None);
+        for (var index = 0; index < renderers.Length; index++)
+        {
+            var renderer = renderers[index];
+            if (renderer != null && renderer.enabled && Diagnostics.PathOf(renderer.transform).Contains(pathPart, StringComparison.Ordinal))
+            {
+                renderer.enabled = false;
+                count++;
+            }
+        }
+        Log.Msg($"Hid {count} renderer(s) containing '{pathPart}'.");
+    }
+
+    private static Il2Cpp.InteractionController _interaction;
+
+    /// <summary>What the game would interact with now ("use"), or null.</summary>
+    private static Il2CppKeepsake.Interactable_Base InteractionTarget()
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        if (player == null)
+            return null;
+        if (_interaction == null || _interaction.m_PlayerController != player)
+            _interaction = player.GetComponentInChildren<Il2Cpp.InteractionController>(true);
+        return _interaction != null ? _interaction.BestEligibleInteraction : null;
+    }
+
+    private Il2CppKeepsake.Interactable_Base _testTarget;
+
+    /// <summary>Test scenarios: picks the nearest interactable whose type name contains the text.</summary>
+    private void PickTarget(string typeName)
+    {
+        _testTarget = null;
+        var best = float.MaxValue;
+        var eye = _cameraRig.RightEye != null ? _cameraRig.RightEye.transform.position : Vector3.zero;
+        var all = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.Interactable_Base>(FindObjectsSortMode.None);
+        for (var index = 0; index < all.Length; index++)
+        {
+            var interactable = all[index];
+            if (interactable == null || !interactable.isActiveAndEnabled ||
+                !interactable.GetIl2CppType().Name.Contains(typeName, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var distance = Vector3.Distance(interactable.transform.position, eye);
+            if (distance < best)
+            {
+                best = distance;
+                _testTarget = interactable;
+            }
+        }
+        if (_testTarget == null)
+            throw new InvalidOperationException($"no interactable like '{typeName}'");
+        Log.Msg($"Target: {_testTarget.GetIl2CppType().Name} at {best:F1} m.");
+    }
+
+    private Vector3? TargetDirection()
+    {
+        if (_testTarget == null || _cameraRig.RightEye == null)
+            return null;
+        return _testTarget.transform.position - _cameraRig.RightEye.transform.position;
+    }
+
+    /// <summary>Test scenarios: lists interactable objects within 12 m of the eyes, nearest first.</summary>
+    private void LogInteractables()
+    {
+        var eye = _cameraRig.RightEye != null ? _cameraRig.RightEye.transform.position : Vector3.zero;
+        var found = new System.Collections.Generic.List<(float Distance, string Text)>();
+        var all = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.Interactable_Base>(FindObjectsSortMode.None);
+        for (var index = 0; index < all.Length; index++)
+        {
+            var interactable = all[index];
+            if (interactable == null || !interactable.isActiveAndEnabled)
+                continue;
+            var distance = Vector3.Distance(interactable.transform.position, eye);
+            if (distance < 12f)
+                found.Add((distance, $"{distance:F1} m {interactable.GetIl2CppType().Name} {Diagnostics.PathOf(interactable.transform)}"));
+        }
+        found.Sort((a, b) => a.Distance.CompareTo(b.Distance));
+        var text = new System.Text.StringBuilder("Interactables near the player:");
+        foreach (var (_, line) in found)
+            text.AppendLine().Append("  ").Append(line);
+        Log.Msg(text.ToString());
+    }
+
     private void ScenarioCommand(string command)
     {
         switch (command)
@@ -614,6 +774,16 @@ public sealed class JumpSpaceVrMod : MelonMod
             case "galaxymap":
                 OpenGalaxyMap();
                 break;
+            case "interactables":
+                LogInteractables();
+                break;
+            case "near":
+                LogRenderersNearEyes();
+                break;
+            case "eyeshot":
+                if (_stereoRenderer.LeftTexture != null)
+                    EyeSnapshot.SaveSingle(_stereoRenderer.LeftTexture, "eye-left");
+                break;
             case "itemtohand":
                 if (!_motion.MoveItemToHandSocket())
                     throw new InvalidOperationException("no held item or hand socket");
@@ -628,6 +798,12 @@ public sealed class JumpSpaceVrMod : MelonMod
                 var parts = command.Split(' ', 3);
                 if (parts.Length == 3 && parts[0] == "config")
                     _config.SetTemporarily(parts[1], parts[2]);
+                else if (parts.Length >= 2 && parts[0] == "target")
+                    PickTarget(parts[1]);
+                else if (parts.Length >= 2 && parts[0] == "hide")
+                    HideRenderers(command.Substring(5).Trim());
+                else if (parts.Length >= 2 && parts[0] == "tree")
+                    LogTree(command.Substring(5).Trim());
                 else if (parts.Length == 3 && parts[0] == "pad")
                 {
                     var values = parts[2].Split(' ');
@@ -1052,6 +1228,22 @@ public sealed class JumpSpaceVrMod : MelonMod
                 _motion.Body.Reset(_frame.YawOf(Camera.main.transform.rotation));
                 _resetBodyYaw = false;
             }
+            // Body follows head: when the player turns their head well away from the body, the body turns after it
+            // (and the tracking origin with it, so the view doesn't move), so walking goes where they face.
+            if (_motion.IsActive && _config.BodyFollowsHead.Value && !_mapView)
+            {
+                var headYaw = Mathf.DeltaAngle(0f, left.Rotation.eulerAngles.y);
+                var bodyTurn = _bodyFollow.Step(headYaw, Time.unscaledDeltaTime);
+                if (bodyTurn != 0f)
+                {
+                    _motion.Body.Turn(bodyTurn);
+                    _headTracker.TurnOrigin(bodyTurn);
+                    left = _headTracker.Localize(leftView, positional);
+                    right = _headTracker.Localize(rightView, positional);
+                }
+            }
+            else
+                _bodyFollow.Reset();
             float? bodyYaw = _motion.IsActive ? _motion.Body.Yaw : null;
 
             _cameraRig.Dlss = _config.Dlss.Value;
@@ -1104,7 +1296,8 @@ public sealed class JumpSpaceVrMod : MelonMod
                     _config.WorldScale.Value,
                     new Vector3(_config.WeaponOffsetX.Value, _config.WeaponOffsetY.Value, _config.WeaponOffsetZ.Value),
                     _config.WeaponInHand.Value, SightShift(), _config.LeftHandRoll.Value,
-                    (_cameraRig.LeftEye.transform.position + _cameraRig.RightEye.transform.position) * 0.5f);
+                    (_cameraRig.LeftEye.transform.position + _cameraRig.RightEye.transform.position) * 0.5f,
+                    _cameraRig.LeftEye.transform.rotation, _rawControllerState.RightTrigger, _config.LookToInteract.Value);
                 ShareHands(controllers, positional);
             }
         }

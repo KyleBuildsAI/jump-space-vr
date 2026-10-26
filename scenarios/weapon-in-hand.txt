@@ -34,6 +34,8 @@ expect weaponInHand == 1
 expect twoHanded == 0
 expect rightHandErrorCm < 3
 expect leftHandErrorCm < 6
+# The body sits a little behind and below the eyes, so shoulders and collar stay out of the eye cameras.
+expect shoulderClearanceCm > 30
 snapshot
 
 # The body stands under the head, facing the body direction: leaning and aiming to the side don't sway it into view.

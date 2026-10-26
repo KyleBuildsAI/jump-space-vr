@@ -2,6 +2,8 @@
 # moves relative to the body. Starts from the main menu and enters the prologue with the keyboard.
 
 waitfor vrRendering == 1 120
+# This checks aiming with the controller; in the prologue nothing is held, which would otherwise mean gaze aiming.
+config LookToInteract false
 head 0 1.6 0  0 0 0
 hand right 0.2 1.3 0.3  0 0 0
 recenter

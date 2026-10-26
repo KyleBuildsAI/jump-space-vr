@@ -36,6 +36,8 @@ internal sealed class ModConfig
     public MelonPreferences_Entry<float> ShadowDistance { get; }
     public MelonPreferences_Entry<Rendering.ComfortVignetteLevel> ComfortVignette { get; }
     public MelonPreferences_Entry<bool> RealCrouch { get; }
+    public MelonPreferences_Entry<bool> BodyFollowsHead { get; }
+    public MelonPreferences_Entry<bool> LookToInteract { get; }
     public MelonPreferences_Entry<string> DebugFrameSettingsOff { get; }
     public MelonPreferences_Entry<bool> ShowFrameRate { get; }
     public MelonPreferences_Entry<bool> ShowCrosshair { get; }
@@ -132,6 +134,12 @@ internal sealed class ModConfig
             "Developer option for measuring frame rate: HDRP frame settings to switch off on the eye cameras, comma separated.");
         ComfortVignette = _category.CreateEntry("ComfortVignette", Rendering.ComfortVignetteLevel.Off, "Comfort vignette",
             "Darken the edges of the view while the stick moves or turns you (helps against motion sickness): Off, Low, Medium, High.");
+        BodyFollowsHead = _category.CreateEntry("BodyFollowsHead", true, "Body follows head",
+            "When you physically turn more than about 35 degrees, your character turns with you (walking goes where you face), " +
+            "so the right stick is needed less. Your view itself never moves.");
+        LookToInteract = _category.CreateEntry("LookToInteract", true, "Look to interact",
+            "With the gun lowered (pointing down) or nothing in hand, the game looks where you look: interaction prompts " +
+            "(press X to grapple, pick up, buttons) follow your gaze. Raise the gun or pull the trigger to aim with it again.");
         RealCrouch = _category.CreateEntry("RealCrouch", false, "Real crouch",
             "Duck in your room to crouch in the game (and stand up to stand). Recenter while standing. On foot only.");
         ShadowDistance = _category.CreateEntry("ShadowDistance", 0f, "VR shadow distance (m)",

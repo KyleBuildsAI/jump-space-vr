@@ -258,7 +258,7 @@ internal static partial class Diagnostics
         return names.ToString();
     }
 
-    private static string PathOf(Transform transform)
+    internal static string PathOf(Transform transform)
     {
         var path = transform.name;
         for (var parent = transform.parent; parent != null; parent = parent.parent)
