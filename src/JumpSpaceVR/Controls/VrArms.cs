@@ -181,11 +181,13 @@ internal sealed class VrArms
 
         PlaceBodyUnderHead(head, bodyRotation);
 
-        // The animated grip poses, relative to the weapon, before anything moves.
-        // The item locator is the weapon's reference frame in both cases: it is still animated when the item hangs on
-        // the hand socket, while the item's own pivot there is oriented differently (using it made the gun point off
-        // the controller and moved the fore-end grab point).
-        var weaponPose = new HandPose(_locator.position, _locator.rotation);
+        // The animated grip poses, relative to the weapon, before anything moves. The weapon's reference frame is the
+        // attach point the item hangs on: the item locator, which the animation keeps on the right hand's socket, or
+        // that socket itself. When the game hangs the item on the socket (after the prologue, for one) the locator is
+        // no longer animated and drifts far away, turned about 110 degrees: measuring from it laid the gun sideways in
+        // the hand and put the fore-end grab point out of reach.
+        var frame = onHand ? _handSocket : _locator;
+        var weaponPose = new HandPose(frame.position, frame.rotation);
         var itemInWeapon = Relative(weaponPose, new HandPose(_item.position, _item.rotation));
         var rightInWeapon = Relative(weaponPose, new HandPose(_rightArm.Hand.position, _rightArm.Hand.rotation));
         var leftInWeapon = Relative(weaponPose, new HandPose(_leftArm.Hand.position, _leftArm.Hand.rotation));
