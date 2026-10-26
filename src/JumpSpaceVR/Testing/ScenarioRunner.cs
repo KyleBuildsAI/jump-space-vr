@@ -20,6 +20,7 @@ namespace JumpSpaceVR.Testing;
 ///   target GalaxyMap|GrapplingPoint [name]   pick the nearest interactable or grapple point (onTarget, grappleAimed)
 ///   aimat 0.8                                 look that high up the target (0 bottom, 1 top; default 0.5)
 ///   face                                      turn the body to face the target
+///   itemframes                                log the held item and hand poses as the game animates them
 ///   targetinfo                                log where the target and its colliders are
 ///   goto 1.5 [front|back|spot]                move the player that far from the target (spot: free floor with a view)
 ///   headlook targetYaw targetPitch            turn the head to angles the mod measures (relative to the body)
@@ -35,7 +36,7 @@ namespace JumpSpaceVR.Testing;
 ///   galaxymap                                 open the galaxy map as if the player used its terminal
 ///   tree PF_GUI/FullScreenGUI/PF_FirstPersonHUD    log a scene object's children (active state, depth 4)
 ///   eyeshot                                   save the left eye's render texture directly (eye-left-*.bmp)
-///   itemtohand                                hang the held item on the right hand's socket (as some spawns do)
+///   itemtohand                                keep the held item on the right hand's socket (as some spawns do)
 ///   snapshot | diagnostics | recenter | log text | quit
 /// </summary>
 internal sealed class ScenarioRunner
@@ -225,6 +226,7 @@ internal sealed class ScenarioRunner
                 case "itemtohand":
                 case "galaxymap":
                 case "rig":
+                case "itemframes":
                 case "snapshot":
                 case "diagnostics":
                 case "recenter":

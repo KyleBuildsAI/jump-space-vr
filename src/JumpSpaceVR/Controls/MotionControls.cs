@@ -82,21 +82,37 @@ internal sealed class MotionControls
             AppendHierarchy(text, node.GetChild(index), depth + 1);
     }
 
-    /// <summary>True when the player's first-person rig holds an item (a gun in the hangar or a mission).</summary>
-    /// <summary>Test scenarios: hangs the held item on the right hand's socket, as some spawns do.</summary>
-    public bool MoveItemToHandSocket()
+    /// <summary>
+    /// Test scenarios: from now on keeps the held item on the right hand's socket with the item locator left turned and
+    /// far away, as the game does on some spawns (often after a prologue session). An item only moved there once is
+    /// put straight back on the locator by the game, so this is re-applied every frame.
+    /// </summary>
+    public bool SimulateSocketSpawn()
+    {
+        RestoreWeapon();
+        _simulateSocketSpawn = true;
+        return HoldItemOnSocket();
+    }
+
+    private bool _simulateSocketSpawn;
+
+    // Where a real socket spawn left the item locator, relative to its parent.
+    private static readonly Vector3 StaleLocatorPosition = new(-104f, -444f, -330f);
+    private static readonly Quaternion StaleLocatorRotation = Quaternion.Euler(0f, 110f, 0f);
+
+    private bool HoldItemOnSocket()
     {
         var weapon = FindWeapon();
         var locator = weapon != null ? FindItemLocator(weapon) : null;
         var socket = weapon != null ? FindHandSocket(weapon) : null;
-        if (socket != null && socket.childCount > 0)
-            return true;
-        if (locator == null || socket == null || locator.childCount == 0)
+        if (locator == null || socket == null)
             return false;
-        RestoreWeapon();
+        // Attached as the game does: at the socket itself.
         while (locator.childCount > 0)
-            locator.GetChild(0).SetParent(socket, true);
-        return true;
+            locator.GetChild(0).SetParent(socket, false);
+        locator.localPosition = StaleLocatorPosition;
+        locator.localRotation = StaleLocatorRotation;
+        return socket.childCount > 0;
     }
 
     /// <summary>Children of the item locator and of the right hand's socket (for tests), or -1 without them.</summary>
@@ -111,6 +127,7 @@ internal sealed class MotionControls
         }
     }
 
+    /// <summary>True when the player's first-person rig holds an item (a gun in the hangar or a mission).</summary>
     public bool HoldsItem
     {
         get
@@ -221,6 +238,8 @@ internal sealed class MotionControls
                     viewRotation * (leftPointer.IsValid ? leftPointer.Rotation : leftHand.Rotation))
                 : null;
             var rig = FindWeapon();
+            if (_simulateSocketSpawn)
+                HoldItemOnSocket();
             if (rig == null || !Arms.Update(rig, handPose, pointerRotation, left, leftGrip, weaponOffset, viewRotation, leftHandRoll, head))
                 Arms.Idle();
             else

@@ -107,6 +107,12 @@ internal sealed class VrArms
     /// <summary>Yaw of the body after placement relative to the body direction (degrees), for tests.</summary>
     public float BodyYawError { get; private set; }
 
+    /// <summary>
+    /// Where the held item model itself points after placement (world space), or null, for tests: unlike
+    /// <see cref="Barrel"/> it does not depend on the reference frame the placement used.
+    /// </summary>
+    public Vector3? HeldItemForward { get; private set; }
+
     /// <summary>Where the weapon's barrel points after placement (world space), or null.</summary>
     public Ray? Barrel { get; private set; }
 
@@ -153,12 +159,36 @@ internal sealed class VrArms
         _locatorMoved = false;
     }
 
+    private bool _logFrames;
+
+    /// <summary>Test scenarios: logs the game's animated item and hand poses on the next placement.</summary>
+    public void LogAnimatedFramesOnce() => _logFrames = true;
+
+    private string DescribeAnimatedFrames(bool onHand)
+    {
+        var hand = new HandPose(_rightArm.Hand.position, _rightArm.Hand.rotation);
+        string Describe(string label, Transform node)
+        {
+            if (node == null)
+                return $"  {label}: none";
+            var local = Relative(hand, new HandPose(node.position, node.rotation));
+            return $"  {label}: {local.position} {local.rotation.eulerAngles} (local {node.localPosition} {node.localEulerAngles})";
+        }
+        return string.Join(System.Environment.NewLine,
+            $"Animated frames relative to the right hand bone (item '{_item.name}' on the {(onHand ? "hand socket" : "item locator")}):",
+            Describe("item locator", _locator),
+            Describe("hand socket", _handSocket),
+            Describe("item", _item),
+            Describe("left hand", _leftArm.Hand));
+    }
+
     /// <summary>Weapon in hand is not active this frame: drop the hold and hide the grab highlight.</summary>
     public void Idle()
     {
         TwoHanded = false;
         CanGrab = false;
         Barrel = null;
+        HeldItemForward = null;
         SetHighlight(null, Quaternion.identity);
     }
 
@@ -178,6 +208,12 @@ internal sealed class VrArms
         _item = !onHand ? _locator : _handSocket != null && _handSocket.childCount > 0 ? _handSocket.GetChild(0) : null;
         if (_item == null)
             return false;
+
+        if (_logFrames)
+        {
+            _logFrames = false;
+            Log.Msg(DescribeAnimatedFrames(onHand));
+        }
 
         PlaceBodyUnderHead(head, bodyRotation);
 
@@ -246,6 +282,8 @@ internal sealed class VrArms
         var expectedItem = Absolute(placed, itemInWeapon);
         ItemPlacementError = Vector3.Distance(_item.position, expectedItem.position) + Quaternion.Angle(_item.rotation, expectedItem.rotation) * 0.001f;
         ShoulderClearance = Mathf.Min(Clearance(_leftArm, head), Clearance(_rightArm, head));
+        var held = onHand ? _item : _locator.childCount > 0 ? _locator.GetChild(0) : null;
+        HeldItemForward = held != null ? held.forward : null;
 
         // Show where to grab while the free left hand is close to the fore-end.
         if (CanGrab && !TwoHanded)
