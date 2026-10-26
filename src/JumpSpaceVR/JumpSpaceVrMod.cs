@@ -9,7 +9,7 @@ using MelonLoader;
 using UnityEngine;
 using UnityEngine.XR;
 
-[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.12.0", "Kyle Coleman")]
+[assembly: MelonInfo(typeof(JumpSpaceVR.JumpSpaceVrMod), "JumpSpaceVR", "0.12.1", "Kyle Coleman")]
 [assembly: MelonGame("Keepsake Games", "Jump Space")]
 [assembly: System.Runtime.Versioning.SupportedOSPlatform("windows")]
 
@@ -521,6 +521,9 @@ public sealed class JumpSpaceVrMod : MelonMod
             "gripSpanZ" => _motion.Arms.GripSpan.z,
             "barrelYaw" => _motion.Arms.Barrel.HasValue
                 ? Mathf.DeltaAngle(_cameraRig.ViewRotation.eulerAngles.y, Quaternion.LookRotation(_motion.Arms.Barrel.Value.direction).eulerAngles.y)
+                : null,
+            "gunYaw" => _motion.Arms.HeldItemForward is { } gunForward
+                ? Mathf.DeltaAngle(_cameraRig.ViewRotation.eulerAngles.y, Quaternion.LookRotation(gunForward).eulerAngles.y)
                 : null,
             "locatorChildren" => _motion.ItemSlots.Locator,
             "socketChildren" => _motion.ItemSlots.Socket,
@@ -1124,8 +1127,11 @@ public sealed class JumpSpaceVrMod : MelonMod
                     EyeSnapshot.SaveSingle(_stereoRenderer.LeftTexture, "eye-left");
                 break;
             case "itemtohand":
-                if (!_motion.MoveItemToHandSocket())
+                if (!_motion.SimulateSocketSpawn())
                     throw new InvalidOperationException("no held item or hand socket");
+                break;
+            case "itemframes":
+                _motion.Arms.LogAnimatedFramesOnce();
                 break;
             case "rig":
                 Log.Msg("First-person rig hierarchy:" + Environment.NewLine + _motion.DescribeRigHierarchy());
