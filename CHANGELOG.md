@@ -3,6 +3,19 @@
 All notable changes to Jump Space VR. Versions follow [semantic versioning](https://semver.org/); downloads are on
 the [Releases](https://github.com/KyleBuildsAI/jump-space-vr/releases) page.
 
+## 0.12.0
+
+From player feedback on the first public video (thanks!):
+
+- **Look to interact**: lower the gun and the game looks where you look, so "press X to grapple" and other prompts,
+  pickups and buttons follow your eyes instead of the gun. Raise the gun or pull the trigger to aim with it again.
+- **Body follows head**: turning your head well to one side turns your character with you; walking goes where you
+  face and the right stick is needed far less. The view itself never moves.
+- **Left shoulder**: the body sits a little behind and below the eyes, and a free left hand lowers its shoulder
+  instead of keeping it raised in the two-handed gun pose, so it no longer hunches into the view.
+- **Recording**: the desktop window crops the outer edges of the eye image, where black bands showed in recordings.
+- F10 snapshots also save the eye images as rendered.
+
 ## 0.11.2
 
 - Weapon in hand works when the game hangs the gun on the right hand's socket instead of the item locator (some
