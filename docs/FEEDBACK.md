@@ -27,6 +27,13 @@ Performance on an RTX 4080: fine, no complaints.
   animation keeps the left clavicle raised for a two-handed grip even when the left hand is free.
 - 5 did not reproduce with the test runtime (with or without DLSS); the video shows black bands at varying edges in
   a few frames, consistent with the eye image's edges reaching the window.
+- 2026-10-26, before/after captures in the game (test runtime, head looking at the object, gun pointing away): with
+  look to interact on, the hangar grapple point shows its reticle and key prompt, the galaxy map table shows "Galaxy
+  map · View map" (with it off the prompt went to whatever the gun pointed at), and the prologue's outer airlock
+  panel shows "Airlock · Cycle". Kept as checks in `scenarios/interaction-prompts.txt` and
+  `scenarios/airlock-prompt.txt`.
+- The game itself only offers a grapple 10-30 m from the point (for the hangar's point) and from about level with it
+  or above, so standing close to or below one never shows "Press X to grapple", with or without the mod.
 
 ### Originally planned
 
