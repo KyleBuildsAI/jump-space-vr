@@ -17,7 +17,11 @@ namespace JumpSpaceVR.Testing;
 ///   wait 2.5                                  seconds
 ///   waitfor inLevel == 1 120                  metric, operator, value, timeout seconds
 ///   head x y z pitch yaw roll                 meters / degrees, tracking space
-///   target Toilet                             pick the nearest interactable of a type (onTarget, targetYaw...)
+///   target GalaxyMap|GrapplingPoint [name]   pick the nearest interactable or grapple point (onTarget, grappleAimed)
+///   aimat 0.8                                 look that high up the target (0 bottom, 1 top; default 0.5)
+///   face                                      turn the body to face the target
+///   targetinfo                                log where the target and its colliders are
+///   goto 1.5 [front|back|spot]                move the player that far from the target (spot: free floor with a view)
 ///   headlook targetYaw targetPitch            turn the head to angles the mod measures (relative to the body)
 ///   hand right x y z pitch yaw roll           grip and aim pose of one hand
 ///   input right.trigger 1                     see ConformanceInputDriver for names; sticks take two values
@@ -199,7 +203,13 @@ internal sealed class ScenarioRunner
                     _command($"pad {parts[1]} {(parts.Length > 2 ? parts[2] : "0")} {(parts.Length > 3 ? parts[3] : "0")}");
                     break;
                 case "target":
-                    _command($"target {parts[1]}");
+                    _command($"target {step.Substring(7).Trim()}");
+                    break;
+                case "aimat":
+                    _command($"aimat {parts[1]}");
+                    break;
+                case "goto":
+                    _command($"goto {step.Substring(5).Trim()}");
                     break;
                 case "hide":
                     _command($"hide {step.Substring(5).Trim()}");
@@ -208,6 +218,8 @@ internal sealed class ScenarioRunner
                     _command($"tree {step.Substring(5).Trim()}");
                     break;
                 case "interactables":
+                case "targetinfo":
+                case "face":
                 case "near":
                 case "eyeshot":
                 case "itemtohand":
