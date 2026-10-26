@@ -6,8 +6,8 @@ Work on these starts when the maintainer says to resume.
 ## 2026-10-24: Discord video and a player with an RTX 4080 (v0.11.x)
 
 Source: a player recorded the mod and posted it on Discord
-([video](https://www.youtube.com/watch?v=SFjZLRDXAkk)); written feedback from a player on an RTX 4080 ("all was
-fine for me ... very promising and already plays really sweet"), plus the maintainer's own notes.
+([video](https://www.youtube.com/watch?v=SFjZLRDXAkk)); written feedback from a player on an RTX 4080 (positive
+overall), plus the maintainer's own notes.
 
 Performance on an RTX 4080: fine, no complaints.
 
