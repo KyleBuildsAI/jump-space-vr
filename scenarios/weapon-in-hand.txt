@@ -56,6 +56,7 @@ wait 1
 # there highlights it, holding the left grip takes hold, and the gun then points from the right hand to the left.
 hand left 0.10 1.287 0.734  0 0 0
 wait 1
+print gripSpanX gripSpanY gripSpanZ leftHandValid gazeAim locatorChildren socketChildren
 expect canGrab == 1
 expect gripHighlight == 1
 snapshot

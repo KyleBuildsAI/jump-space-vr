@@ -576,6 +576,8 @@ public sealed class JumpSpaceVrMod : MelonMod
             "gamepadLeftY" => _lastControllerState.LeftStick.y,
             "rightTrigger" => _lastControllerState.RightTrigger,
             "rightHandValid" => _lastControllerState.RightHand.IsValid ? 1f : 0f,
+            "leftHandValid" => _lastControllerState.LeftHand.IsValid ? 1f : 0f,
+            "leftGrip" => _rawControllerState.LeftGrip,
             "rightHandX" => _lastControllerState.RightHand.Position.x,
             "rightHandY" => _lastControllerState.RightHand.Position.y,
             "rightHandZ" => _lastControllerState.RightHand.Position.z,
