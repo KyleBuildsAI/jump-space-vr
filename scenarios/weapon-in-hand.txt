@@ -70,9 +70,11 @@ hand left 0.30 1.287 0.70  0 0 0
 wait 1
 expect twoHanded == 1
 expect barrelYaw > 8
+expect gunYaw > 8
 hand left -0.10 1.287 0.70  0 0 0
 wait 1
 expect barrelYaw < -8
+expect gunYaw < -8
 
 # Letting go returns to one hand: the gun points along the right controller again.
 input left.grip 0
@@ -80,20 +82,37 @@ hand left -0.25 1.0 0.1  0 0 0
 wait 1
 expect twoHanded == 0
 expect barrelYaw == 0 3
+expect gunYaw == 0 5
 
-# Some spawns hang the gun on the right hand's socket instead of the item locator: it is still held, and the right
-# hand (with the gun on it) is placed on the controller.
+# Some spawns (often after a prologue session) hang the gun on the right hand's socket instead of the item locator,
+# and leave the locator far away and turned. The gun is still held: it points along the controller, and the left hand
+# can take the fore-end.
 itemtohand
 hand right 0.18 1.3 0.35  10 0 0
 hand left -0.25 1.0 0.1  0 0 0
 wait 1.5
+expect socketChildren == 1
 expect holdsItem == 1
 expect weaponInHand == 1
 expect rightHandErrorCm < 3
 expect barrelYaw == 0 3
+expect gunYaw == 0 5
 expect itemPlaceErrorCm < 3
 hand right 0.18 1.3 0.35  0 25 0
 wait 1
 expect barrelYaw == 25 4
+expect gunYaw == 25 5
 expect itemPlaceErrorCm < 3
+hand right 0.18 1.3 0.35  10 0 0
+hand left 0.10 1.287 0.734  0 0 0
+wait 1
+print gripSpanX gripSpanY gripSpanZ locatorChildren socketChildren
+expect canGrab == 1
+input left.grip 1
+wait 1
+expect twoHanded == 1
+hand left 0.30 1.287 0.70  0 0 0
+wait 1
+expect gunYaw > 8
+input left.grip 0
 snapshot
