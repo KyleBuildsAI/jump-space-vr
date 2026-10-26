@@ -547,8 +547,14 @@ public sealed class JumpSpaceVrMod : MelonMod
             "gazeAim" => _motion.GazeWeight,
             // The interactable picked with "target <type>": whether the game would use it now, and where it is
             // relative to the body (for headlook).
-            "onTarget" => _testTarget != null && InteractionTarget() is { } current &&
-                current.GetInstanceID() == _testTarget.GetInstanceID() ? 1f : 0f,
+            "onTarget" => _testInteractable != null && InteractionTarget() is { } current &&
+                current.GetInstanceID() == _testInteractable.GetInstanceID() ? 1f : 0f,
+            "grappleAimed" => _testGrapple != null && AimedGrapplePoint() is { } aimed &&
+                aimed.GetInstanceID() == _testGrapple.GetInstanceID() ? 1f : 0f,
+            "anyGrappleAimed" => AimedGrapplePoint() != null ? 1f : 0f,
+            "playerX" => LocalPlayerPosition().x,
+            "playerY" => LocalPlayerPosition().y,
+            "playerZ" => LocalPlayerPosition().z,
             "hasInteractTarget" => InteractionTarget() != null ? 1f : 0f,
             "targetYaw" => TargetDirection() is { } toTarget
                 ? Mathf.DeltaAngle(_motion.Body.Yaw, _frame.YawOf(Quaternion.LookRotation(toTarget)))
@@ -703,38 +709,361 @@ public sealed class JumpSpaceVrMod : MelonMod
         return _interaction != null ? _interaction.BestEligibleInteraction : null;
     }
 
-    private Il2CppKeepsake.Interactable_Base _testTarget;
+    // Test scenarios: the object picked with "target", as a transform and (when it is one) an interactable or a grapple point.
+    private Transform _testTarget;
+    private Il2CppKeepsake.Interactable_Base _testInteractable;
+    private Il2CppKeepsake.GrapplingPoint _testGrapple;
+    // How high up the target's collider to look, from 0 (bottom) to 1 (top): "aimat 0.8" for a panel's screen.
+    private float _testAimHeight = 0.5f;
 
-    /// <summary>Test scenarios: picks the nearest interactable whose type name contains the text.</summary>
-    private void PickTarget(string typeName)
+    /// <summary>
+    /// Test scenarios: picks the nearest grapple point ("target GrapplingPoint") or interactable whose type name
+    /// contains the text ("target AirlockPanel", "target GalaxyMap"), optionally only objects whose name contains
+    /// <paramref name="objectName"/> ("target AirlockPanel PF_AirlockPanel_02").
+    /// </summary>
+    private void PickTarget(string typeName, string objectName)
     {
         _testTarget = null;
+        _testInteractable = null;
+        _testGrapple = null;
+        _testAimHeight = 0.5f;
         var best = float.MaxValue;
-        var eye = _cameraRig.RightEye != null ? _cameraRig.RightEye.transform.position : Vector3.zero;
-        var all = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.Interactable_Base>(FindObjectsSortMode.None);
-        for (var index = 0; index < all.Length; index++)
+        var from = LocalPlayerPosition();
+        if (typeName.Equals("GrapplingPoint", StringComparison.OrdinalIgnoreCase))
         {
-            var interactable = all[index];
-            if (interactable == null || !interactable.isActiveAndEnabled ||
-                !interactable.GetIl2CppType().Name.Contains(typeName, StringComparison.OrdinalIgnoreCase))
-                continue;
-            var distance = Vector3.Distance(interactable.transform.position, eye);
-            if (distance < best)
+            var points = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.GrapplingPoint>(FindObjectsSortMode.None);
+            for (var index = 0; index < points.Length; index++)
             {
-                best = distance;
-                _testTarget = interactable;
+                var point = points[index];
+                if (point == null || !point.isActiveAndEnabled ||
+                    !point.name.Contains(objectName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var distance = Vector3.Distance(point.transform.position, from);
+                if (distance < best)
+                {
+                    best = distance;
+                    _testGrapple = point;
+                    _testTarget = point.transform;
+                }
+            }
+        }
+        else
+        {
+            var all = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.Interactable_Base>(FindObjectsSortMode.None);
+            for (var index = 0; index < all.Length; index++)
+            {
+                var interactable = all[index];
+                if (interactable == null || !interactable.isActiveAndEnabled ||
+                    !interactable.GetIl2CppType().Name.Contains(typeName, StringComparison.OrdinalIgnoreCase) ||
+                    !interactable.name.Contains(objectName, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                var distance = Vector3.Distance(interactable.transform.position, from);
+                if (distance < best)
+                {
+                    best = distance;
+                    _testInteractable = interactable;
+                    _testTarget = interactable.transform;
+                }
             }
         }
         if (_testTarget == null)
-            throw new InvalidOperationException($"no interactable like '{typeName}'");
-        Log.Msg($"Target: {_testTarget.GetIl2CppType().Name} at {best:F1} m.");
+            throw new InvalidOperationException($"no '{typeName}' in this scene");
+        Log.Msg($"Target: {typeName} '{_testTarget.name}' at {best:F1} m ({Diagnostics.PathOf(_testTarget)}).");
+    }
+
+    private static Il2CppKinematicCharacterController.KinematicCharacterMotor LocalPlayerMotor()
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        return player != null
+            ? player.GetComponentInChildren<Il2CppKinematicCharacterController.KinematicCharacterMotor>(true)
+            : null;
+    }
+
+    private static Vector3 LocalPlayerPosition()
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        return player != null ? player.transform.position : Vector3.zero;
+    }
+
+    /// <summary>
+    /// Test scenarios: moves the local player <paramref name="distance"/> meters from the target: on the floor on the
+    /// side they are already on, in front of or behind its face at eye height ("front", "back"), or at the nearest
+    /// free floor with a clear view of it ("spot").
+    /// </summary>
+    private void GoToTarget(float distance, string side)
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        if (player == null || _testTarget == null)
+            throw new InvalidOperationException("no player or target");
+        var target = TargetPoint();
+        Vector3 stand;
+        if (side == "spot")
+        {
+            stand = FindStandingSpot(target, distance) ??
+                throw new InvalidOperationException($"no free floor with a view of the target near {target}");
+        }
+        else if (side == "front" || side == "back")
+        {
+            // In front of (or behind) the target's face, with the eyes at its height: for wall panels, also out in
+            // zero-g where there is no floor to stand on. The target's own up is that of the ship or room it is in.
+            var facing = side == "front" ? _testTarget.forward : -_testTarget.forward;
+            stand = target + facing.normalized * distance - _testTarget.up * 1.55f;
+        }
+        else
+        {
+            var away = player.transform.position - target;
+            away.y = 0f;
+            if (away.sqrMagnitude < 0.01f)
+                away = _testTarget.forward;
+            away.y = 0f;
+            stand = target + away.normalized * distance;
+            if (Physics.Raycast(stand + Vector3.up * 1.5f, Vector3.down, out var hit, 10f, ~0, QueryTriggerInteraction.Ignore))
+                stand = hit.point + Vector3.up * 0.02f;
+            else
+                stand.y = player.transform.position.y;
+        }
+        // The character motor keeps its own position and moves the transform back to it, so move the motor.
+        var motor = LocalPlayerMotor();
+        if (motor != null)
+            motor.SetPosition(stand, true);
+        else
+            player.transform.position = stand;
+        // Near or inside a ship the character must ignore the ship's hull volume, as it does after walking up to an
+        // airlock; otherwise the motor pushes it straight out of the hull onto the roof.
+        Physics.SyncTransforms();
+        var movement = player.GetComponentInChildren<Il2Cpp.Player_MovementHandler>(true);
+        var hull = movement != null ? movement.m_SpaceShipIgnoreCollider : null;
+        if (hull != null && motor != null)
+            hull.IgnoreOverlappingSpaceShipColliders(motor.Capsule);
+        var entered = EnterParentTriggersAt(player, stand + player.transform.up);
+        _recenterPending = true;
+        Log.Msg($"Moved the player to {stand} ({distance:F1} m from the target)" +
+                (hull != null && hull.IsInsideAnyShipCollider ? ", inside a ship's hull volume" : "") +
+                (entered.Length > 0 ? $", inside {entered}." : "."));
+    }
+
+    /// <summary>
+    /// Test scenarios: a floor spot about <paramref name="distance"/> from the target with room for the character and
+    /// a clear line of sight from eye height, trying straight in front of it first and then further round each side.
+    /// </summary>
+    private Vector3? FindStandingSpot(Vector3 target, float distance)
+    {
+        // Ships and rooms keep their own up; most are level, so snap to world up when the target is close to it.
+        var up = Vector3.Angle(_testTarget.up, Vector3.up) < 30f ? Vector3.up : _testTarget.up;
+        var front = Vector3.ProjectOnPlane(_testTarget.forward, up);
+        if (front.sqrMagnitude < 0.01f)
+            front = Vector3.ProjectOnPlane(_testTarget.right, up);
+        front.Normalize();
+        var targetCollider = _testTarget.GetComponentInChildren<Collider>(true);
+        // Only what the character collides with counts as floor or as in the way.
+        var motor = LocalPlayerMotor();
+        var solid = motor != null ? motor.CollidableLayers.value : ~0;
+        // Look for the floor from just above the middle of the target, below anything overhanging the floor near it.
+        var floorSearch = (targetCollider != null ? targetCollider.bounds.center : target) + up * 0.5f;
+        var rejected = new System.Text.StringBuilder();
+        foreach (var range in new[] { distance, distance * 0.75f, distance * 1.4f })
+        {
+            for (var step = 0; step < 24; step++)
+            {
+                var angle = (step + 1) / 2 * 15f * (step % 2 == 0 ? 1f : -1f);
+                var direction = Quaternion.AngleAxis(angle, up) * front;
+                if (!Physics.Raycast(floorSearch + direction * range, -up, out var floor, 3f, solid,
+                        QueryTriggerInteraction.Ignore))
+                {
+                    rejected.Append($" {angle:F0}°:no floor");
+                    continue;
+                }
+                var feet = floor.point + up * 0.05f;
+                var height = Vector3.Dot(target - feet, up);
+                if (height < 0.3f || height > 2.2f)
+                {
+                    rejected.Append($" {angle:F0}°:height {height:F2}");
+                    continue;
+                }
+                // The character's core must be free; the motor pushes it out of small overlaps on its own.
+                var inside = FirstRealOverlap(Physics.OverlapCapsule(feet + up * 0.5f, feet + up * 1.5f, 0.15f, solid,
+                    QueryTriggerInteraction.Ignore));
+                if (inside != null)
+                {
+                    rejected.Append($" {angle:F0}°:inside {inside.name}");
+                    continue;
+                }
+                if (Physics.Linecast(feet + up * 1.6f, target, out var blocker, ~0, QueryTriggerInteraction.Ignore) &&
+                    !blocker.transform.IsChildOf(_testTarget))
+                {
+                    rejected.Append($" {angle:F0}°:view blocked by {blocker.collider.name}");
+                    continue;
+                }
+                Log.Msg($"Standing spot {angle:F0}° round from the target's front, {range:F1} m away.");
+                return feet;
+            }
+        }
+        Log.Warning("No standing spot:" + rejected);
+        return null;
+    }
+
+    /// <summary>
+    /// The first collider the character would really be stuck in, skipping solid volumes that enclose a whole ship (its
+    /// hull for collisions in space, which the character ignores while inside it).
+    /// </summary>
+    private static Collider FirstRealOverlap(Il2CppInterop.Runtime.InteropTypes.Arrays.Il2CppReferenceArray<Collider> overlaps)
+    {
+        for (var index = 0; index < overlaps.Length; index++)
+        {
+            if (!IsEnclosingSolid(overlaps[index]))
+                return overlaps[index];
+        }
+        return null;
+    }
+
+    private static bool IsEnclosingSolid(Collider collider)
+    {
+        var size = collider.bounds.size;
+        var hollow = collider.TryCast<MeshCollider>() is { convex: false };
+        return !hollow && size.x > 10f && size.y > 10f && size.z > 10f;
+    }
+
+    /// <summary>
+    /// Tells the game's player-parent triggers (ship interiors, gravity zones) that contain the point that the player
+    /// entered them, as their trigger volumes would if the player had walked in. Returns their names.
+    /// </summary>
+    private static string EnterParentTriggersAt(Il2Cpp.PlayerController player, Vector3 point)
+    {
+        var names = new System.Text.StringBuilder();
+        var triggers = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.PlayerParentTrigger>(FindObjectsSortMode.None);
+        for (var index = 0; index < triggers.Length; index++)
+        {
+            var trigger = triggers[index];
+            var volume = trigger.m_PlayerTrigger_Base;
+            if (volume == null || !Contains(volume.gameObject, point))
+                continue;
+            trigger.PlayerTrigger_BaseOnOnPlayerEntered(player, volume);
+            names.Append(names.Length > 0 ? ", " : "").Append(Diagnostics.PathOf(trigger.transform));
+        }
+        return names.ToString();
+    }
+
+    private static bool Contains(GameObject volume, Vector3 point)
+    {
+        var colliders = volume.GetComponentsInChildren<Collider>(true);
+        for (var index = 0; index < colliders.Length; index++)
+        {
+            var collider = colliders[index];
+            if (collider.TryCast<MeshCollider>() is { convex: false })
+            {
+                if (collider.bounds.Contains(point))
+                    return true;
+            }
+            else if ((collider.ClosestPoint(point) - point).sqrMagnitude < 0.0001f)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>The grapple point the game currently shows the grapple prompt for, or null.</summary>
+    private static Il2CppKeepsake.GrapplingPoint AimedGrapplePoint()
+    {
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        var icons = player != null ? player.GetComponentInChildren<Il2CppKeepsake.GrapplingHookIconHandler>(true) : null;
+        return icons != null ? icons.AimedAtPoint : null;
     }
 
     private Vector3? TargetDirection()
     {
         if (_testTarget == null || _cameraRig.RightEye == null)
             return null;
-        return _testTarget.transform.position - _cameraRig.RightEye.transform.position;
+        return TargetPoint() - _cameraRig.RightEye.transform.position;
+    }
+
+    /// <summary>
+    /// Where to look at the target: a grapple point's hook point; where the game draws a prompt icon (airlock panels);
+    /// else its collider (a terminal's interaction volume) at the height set with "aimat", the centre by default; else
+    /// its pivot, which for some objects sits on the floor.
+    /// </summary>
+    private Vector3 TargetPoint()
+    {
+        if (_testGrapple != null)
+            return _testGrapple.HookPointPosition;
+        var icon = _testTarget.Find("IconPosition");
+        if (icon != null)
+            return icon.position;
+        var collider = _testTarget.GetComponentInChildren<Collider>(true);
+        if (collider == null)
+            return _testTarget.position;
+        var bounds = collider.bounds;
+        return bounds.center + Vector3.up * (bounds.size.y * (_testAimHeight - 0.5f));
+    }
+
+    /// <summary>Test scenarios: logs where the target and its colliders are relative to the player.</summary>
+    private void LogTargetInfo()
+    {
+        if (_testTarget == null)
+            throw new InvalidOperationException("no target");
+        var handler = Il2Cpp.PlayerHandler.GetPlayerHandler;
+        var player = handler != null ? handler.localPlayerController : null;
+        var text = new System.Text.StringBuilder($"Target '{_testTarget.name}': position {_testTarget.position}, ");
+        text.Append($"forward {_testTarget.forward}, up {_testTarget.up}");
+        if (player != null)
+            text.AppendLine().Append($"  player at {player.transform.position}, up {player.transform.up}, in ")
+                .Append(player.transform.parent != null ? Diagnostics.PathOf(player.transform.parent) : "the scene root");
+        if (_cameraRig.RightEye != null)
+            text.AppendLine().Append($"  eye at {_cameraRig.RightEye.transform.position}");
+        var colliders = _testTarget.GetComponentsInChildren<Collider>(true);
+        for (var index = 0; index < colliders.Length; index++)
+        {
+            var collider = colliders[index];
+            text.AppendLine().Append($"  collider {collider.name} trigger={collider.isTrigger} enabled={collider.enabled} ");
+            text.Append($"center {collider.bounds.center} size {collider.bounds.size}");
+        }
+        if (_testGrapple != null)
+        {
+            var point = _testGrapple;
+            text.AppendLine().Append($"  grapple: hook point {point.HookPointPosition}, aimed {AimedGrapplePoint()?.name ?? "none"}, ")
+                .Append($"distance {point.GrappleDistance:F1} m, visible {point.MaxVisibleDistance:F1} m, ")
+                .Append($"closest {Mathf.Sqrt(point.ClosestGrappleDistanceSq):F1} m, angle limit {point.AngleLimit:F0}° ")
+                .Append($"towards {point.AngleLimitDirection} (inverted {point.InvertAngeLimitDirection}), ")
+                .Append($"cone {point.ConeHorizontalAngle:F0}°x{point.ConeVerticalAngle:F0}°, enabled {point.IsEnabled}, ")
+                .Append($"eligible {point.IsEligible}, can grapple {point.CanGrapple}, ")
+                .Append($"good angle and distance {point.PlayerIsWithinGoodAngleAndDistanceToGrapple}");
+            if (_cameraRig.RightEye != null)
+            {
+                var eye = _cameraRig.RightEye.transform.position;
+                text.Append($", valid angle from the eye {point.IsWithinValidAngle(ref eye)}");
+            }
+            var handlers = UnityEngine.Object.FindObjectsByType<Il2CppKeepsake.GrapplingHookIconHandler>(
+                FindObjectsInactive.Include, FindObjectsSortMode.None);
+            for (var index = 0; index < handlers.Length; index++)
+            {
+                var icons = handlers[index];
+                var eligible = icons.m_EligibleGrapplingPoints;
+                text.AppendLine().Append($"  icon handler {Diagnostics.PathOf(icons.transform)} active={icons.isActiveAndEnabled} ")
+                    .Append($"aimed {(icons.AimedAtPoint != null ? icons.AimedAtPoint.name : "none")} ")
+                    .Append($"eligible {(eligible != null ? eligible.Count : -1)}");
+            }
+        }
+        // What surrounds it: the nearest solid surface in each direction from its centre.
+        var centre = TargetPoint();
+        var forward = Vector3.ProjectOnPlane(_testTarget.forward, Vector3.up).normalized;
+        for (var degrees = 0; degrees < 360; degrees += 45)
+            AppendProbe(text, $"{degrees}°", centre, Quaternion.AngleAxis(degrees, Vector3.up) * forward);
+        AppendProbe(text, "up", centre, Vector3.up);
+        AppendProbe(text, "down", centre, Vector3.down);
+        Log.Msg(text.ToString());
+    }
+
+    private static void AppendProbe(System.Text.StringBuilder text, string label, Vector3 from, Vector3 direction)
+    {
+        text.AppendLine().Append($"  probe {label}: ");
+        if (Physics.Raycast(from, direction, out var hit, 6f, ~0, QueryTriggerInteraction.Ignore))
+            text.Append($"{hit.distance:F2} m {Diagnostics.PathOf(hit.collider.transform)}");
+        else
+            text.Append("nothing within 6 m");
     }
 
     /// <summary>Test scenarios: lists interactable objects within 12 m of the eyes, nearest first.</summary>
@@ -779,6 +1108,14 @@ public sealed class JumpSpaceVrMod : MelonMod
             case "interactables":
                 LogInteractables();
                 break;
+            case "targetinfo":
+                LogTargetInfo();
+                break;
+            case "face":
+                if (TargetDirection() is not { } toTarget)
+                    throw new InvalidOperationException("no target");
+                _motion.Body.Turn(Mathf.DeltaAngle(_motion.Body.Yaw, _frame.YawOf(Quaternion.LookRotation(toTarget))));
+                break;
             case "near":
                 LogRenderersNearEyes();
                 break;
@@ -801,7 +1138,15 @@ public sealed class JumpSpaceVrMod : MelonMod
                 if (parts.Length == 3 && parts[0] == "config")
                     _config.SetTemporarily(parts[1], parts[2]);
                 else if (parts.Length >= 2 && parts[0] == "target")
-                    PickTarget(parts[1]);
+                    PickTarget(parts[1], parts.Length >= 3 ? parts[2] : "");
+                else if (parts.Length >= 2 && parts[0] == "aimat")
+                    _testAimHeight = float.Parse(parts[1], System.Globalization.CultureInfo.InvariantCulture);
+                else if (parts.Length >= 2 && parts[0] == "goto")
+                {
+                    var gotoArgs = command.Substring(5).Trim().Split(' ');
+                    GoToTarget(float.Parse(gotoArgs[0], System.Globalization.CultureInfo.InvariantCulture),
+                        gotoArgs.Length > 1 ? gotoArgs[1] : "");
+                }
                 else if (parts.Length >= 2 && parts[0] == "hide")
                     HideRenderers(command.Substring(5).Trim());
                 else if (parts.Length >= 2 && parts[0] == "tree")
